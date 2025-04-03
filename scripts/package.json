@@ -1,0 +1,10 @@
+{
+  "name": "supabase-schema-checker",
+  "version": "1.0.0",
+  "description": "Check Supabase schema against expected schema",
+  "main": "check-schema.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

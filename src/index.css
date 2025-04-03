@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modern Dark Mode Styles */
+.dark,
+.dark-mode {
+  --dark-bg-primary: #121212;
+  --dark-bg-secondary: #1e1e1e;
+  --dark-bg-tertiary: #2d2d2d;
+  --dark-border: #373737;
+  --dark-text-primary: #e2e8f0;
+  --dark-text-secondary: #a0aec0;
+  --dark-btn-hover: rgba(255, 255, 255, 0.08);
+  
+  @apply bg-[color:var(--dark-bg-primary)] text-[color:var(--dark-text-primary)];
+}
+
+/* Modern Card Styling */
+.dark .card,
+.dark-mode .card {
+  @apply bg-[color:var(--dark-bg-secondary)] border-[color:var(--dark-border)] shadow-lg shadow-black/20;
+}
+
+/* Override specific components for dark mode */
+.dark .bg-white,
+.dark-mode .bg-white {
+  @apply bg-[color:var(--dark-bg-secondary)] text-[color:var(--dark-text-primary)] border-[color:var(--dark-border)];
+}
+
+.dark .bg-gray-50,
+.dark-mode .bg-gray-50,
+.dark-mode main,
+.dark main {
+  @apply bg-[color:var(--dark-bg-primary)];
+}
+
+.dark .text-gray-900,
+.dark-mode .text-gray-900 {
+  @apply text-[color:var(--dark-text-primary)];
+}
+
+.dark .text-gray-700,
+.dark-mode .text-gray-700,
+.dark .text-gray-800,
+.dark-mode .text-gray-800 {
+  @apply text-[color:var(--dark-text-secondary)];
+}
+
+.dark .text-gray-600,
+.dark-mode .text-gray-600,
+.dark .text-gray-500,
+.dark-mode .text-gray-500 {
+  @apply text-gray-400;
+}
+
+.dark .border-gray-200,
+.dark-mode .border-gray-200 {
+  @apply border-[color:var(--dark-border)];
+}
+
+.dark .shadow,
+.dark-mode .shadow {
+  @apply shadow-black/20;
+}
+
+/* Table styling for dark mode */
+.dark table,
+.dark-mode table {
+  @apply bg-[color:var(--dark-bg-secondary)] text-[color:var(--dark-text-primary)];
+}
+
+.dark thead th,
+.dark-mode thead th,
+.dark .bg-gray-50,
+.dark-mode .bg-gray-50 {
+  @apply bg-[color:var(--dark-bg-tertiary)] text-[color:var(--dark-text-primary)];
+}
+
+.dark tbody tr,
+.dark-mode tbody tr {
+  @apply border-[color:var(--dark-border)];
+}
+
+.dark tbody tr:hover,
+.dark-mode tbody tr:hover {
+  @apply bg-[color:var(--dark-bg-tertiary)] backdrop-brightness-125;
+}
+
+/* Form elements with proper contrast in dark mode */
+.dark input,
+.dark select,
+.dark textarea,
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  @apply bg-[color:var(--dark-bg-tertiary)] border-[color:var(--dark-border)] text-[color:var(--dark-text-primary)] placeholder-gray-500;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus,
+.dark-mode input:focus,
+.dark-mode select:focus,
+.dark-mode textarea:focus {
+  @apply border-blue-500 ring-blue-500/50;
+}
+
+/* Button styling for dark mode */
+.dark .btn-primary,
+.dark-mode .btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white;
+}
+
+.dark .btn-secondary,
+.dark-mode .btn-secondary {
+  @apply bg-[color:var(--dark-bg-tertiary)] hover:bg-[color:var(--dark-border)] text-[color:var(--dark-text-primary)];
+}
+
+/* Status/badge indicators in dark mode */
+.dark .bg-green-100,
+.dark-mode .bg-green-100 {
+  @apply bg-green-900/30 text-green-400;
+}
+
+.dark .bg-red-100, 
+.dark-mode .bg-red-100 {
+  @apply bg-red-900/30 text-red-400;
+}
+
+.dark .bg-yellow-100,
+.dark-mode .bg-yellow-100 {
+  @apply bg-yellow-900/30 text-yellow-400;
+}
+
+.dark .bg-blue-100,
+.dark-mode .bg-blue-100 {
+  @apply bg-blue-900/30 text-blue-400;
+}
+
+/* Sidebar specific styling */
+.dark .sidebar,
+.dark-mode .sidebar,
+body.dark-mode .sidebar,
+html.dark .sidebar {
+  @apply bg-[color:var(--dark-bg-secondary)] border-[color:var(--dark-border)];
+}
+
+/* Force dark mode on specific components */
+body.dark-mode #root,
+html.dark body {
+  @apply bg-[color:var(--dark-bg-primary)] text-[color:var(--dark-text-primary)];
+}
+
+/* Modern style for settings cards and user profile */
+.dark .settings-card,
+.dark-mode .settings-card {
+  @apply bg-[color:var(--dark-bg-secondary)] border-[color:var(--dark-border)] rounded-xl;
+}
+
+.dark .avatar-bg,
+.dark-mode .avatar-bg {
+  @apply bg-blue-800/30;
+}
+
+/* Settings toggle switch enhancements */
+.dark .toggle-bg,
+.dark-mode .toggle-bg {
+  @apply bg-gray-700;
+}
+
+.dark .toggle-active,
+.dark-mode .toggle-active {
+  @apply bg-blue-500;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-indigo-500;
+  }
+
+  .input {
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-700;
+  }
+
+  .table-container {
+    @apply -my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8;
+  }
+
+  .table-wrapper {
+    @apply inline-block min-w-full py-2 align-middle md:px-6 lg:px-8;
+  }
+
+  .table {
+    @apply min-w-full divide-y divide-gray-300;
+  }
+
+  .table-header {
+    @apply bg-gray-50;
+  }
+
+  .table-header-cell {
+    @apply py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6;
+  }
+
+  .table-body {
+    @apply divide-y divide-gray-200 bg-white;
+  }
+
+  .table-cell {
+    @apply whitespace-nowrap px-3 py-4 text-sm text-gray-500;
+  }
+
+  .table-cell-primary {
+    @apply whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6;
+  }
+
+  .card {
+    @apply bg-white shadow overflow-hidden sm:rounded-lg;
+  }
+
+  .card-header {
+    @apply px-4 py-5 sm:px-6;
+  }
+
+  .card-title {
+    @apply text-lg leading-6 font-medium text-gray-900;
+  }
+
+  .card-body {
+    @apply border-t border-gray-200 px-4 py-5 sm:px-6;
+  }
+
+  .card-footer {
+    @apply bg-gray-50 px-4 py-3 sm:px-6;
+  }
+}
