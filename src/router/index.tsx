@@ -49,7 +49,12 @@ const ErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   return <>{children}</>;
 };
 
-export const router = createBrowserRouter([
+// Public routes that don't require authentication
+const publicRoutes = [
+  {
+    path: '/',
+    element: <Navigate to="/login" replace />,
+  },
   {
     path: '/login',
     element: <Login />,
@@ -74,8 +79,12 @@ export const router = createBrowserRouter([
     path: '/auth/callback',
     element: <VerificationSuccess />,
   },
+];
+
+// Protected routes that require authentication
+const protectedRoutes = [
   {
-    path: '/',
+    path: '/dashboard',
     element: (
       <ErrorBoundary>
         <PrivateRoute>
@@ -114,16 +123,30 @@ export const router = createBrowserRouter([
       },
       {
         path: 'add-product',
-        element: <Navigate to="/products" replace />,
+        element: <Navigate to="/dashboard/products" replace />,
       },
       {
         path: 'stock-adjustments',
-        element: <Navigate to="/inventory" replace />,
+        element: <Navigate to="/dashboard/inventory" replace />,
       },
       {
         path: '*',
-        element: <Navigate to="/" replace />,
+        element: <Navigate to="/dashboard" replace />,
       },
     ],
   },
+];
+
+// Catch-all route for 404s
+const catchAllRoute = [
+  {
+    path: '*',
+    element: <Navigate to="/login" replace />,
+  },
+];
+
+export const router = createBrowserRouter([
+  ...publicRoutes,
+  ...protectedRoutes,
+  ...catchAllRoute,
 ]); 

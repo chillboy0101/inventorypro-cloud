@@ -1,5 +1,5 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface PrivateRouteProps {
@@ -8,6 +8,12 @@ interface PrivateRouteProps {
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Clear any stored redirect path when component mounts
+    sessionStorage.removeItem('redirectPath');
+  }, []);
 
   if (loading) {
     return (
@@ -18,7 +24,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Store the attempted path for redirect after login
+    sessionStorage.setItem('redirectPath', location.pathname);
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   return <>{children}</>;

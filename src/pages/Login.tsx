@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { CubeTransparentIcon } from '@heroicons/react/24/outline';
 import SocialLoginButton from '../components/SocialLoginButton';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,7 @@ export default function Login() {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -20,7 +21,11 @@ export default function Login() {
       setError('');
       setLoading(true);
       await login(email, password);
-      navigate('/');
+      
+      // Get the redirect path from session storage or default to dashboard
+      const redirectPath = sessionStorage.getItem('redirectPath') || '/dashboard';
+      sessionStorage.removeItem('redirectPath');
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
