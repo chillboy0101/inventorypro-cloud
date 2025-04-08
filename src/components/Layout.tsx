@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { applyTheme } from '../utils/themeUtils';
 import { useAppSettings } from '../hooks/useAppSettings';
+import { useAuth } from '../contexts/AuthContext';
 import Notifications from './Notifications';
 import {
   HomeIcon,
@@ -32,15 +33,20 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const settings = useSelector((state: RootState) => state.settings);
   const { companyName } = useAppSettings();
+  const { logout } = useAuth();
 
   // Apply dark mode effect when settings change
   useEffect(() => {
     applyTheme(settings.darkMode || false);
   }, [settings.darkMode]);
 
-  const handleLogout = () => {
-    // For now, just navigate to login page
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // The AuthContext will handle the session cleanup and redirect
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
   };
 
   const handleUserSettings = () => {

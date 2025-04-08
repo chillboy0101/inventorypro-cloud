@@ -1,6 +1,6 @@
 # InventoryPro Cloud
 
-A modern inventory management system built with React, TypeScript, and Supabase.
+A modern inventory management system with barcode scanning, QR code support, and cloud synchronization.
 
 ## Features
 
@@ -156,4 +156,89 @@ src/
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Deployment Guide
+
+### Prerequisites
+
+- Node.js 18+ and npm installed
+- A Supabase account with the project set up
+- OAuth credentials for social login providers (Google, GitHub, etc.)
+
+### Local Development
+
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/inventorypro-cloud.git
+cd inventorypro-cloud
+```
+
+2. Install dependencies
+```bash
+npm install
+```
+
+3. Set up environment variables
+   - Copy `.env.example` to `.env` and update the variables with your credentials
+
+4. Start the development server
+```bash
+npm run dev
+```
+
+### Production Deployment
+
+#### Deploying to Vercel
+
+1. Push your code to a GitHub repository
+
+2. Visit [Vercel](https://vercel.com) and create a new project from your GitHub repository
+
+3. Configure the build settings:
+   - Framework Preset: Vite
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+   - Install Command: `npm install`
+
+4. Add the following environment variables (from your `.env.production` file):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_GOOGLE_CLIENT_ID`
+   - `VITE_GITHUB_CLIENT_ID`
+   - `SITE_URL` - Set to your production domain
+   - `REDIRECT_URL` - Set to `https://your-domain.vercel.app/auth/callback`
+
+5. Deploy the project
+
+6. Update Supabase Authentication Settings:
+   - Go to your Supabase project
+   - Navigate to Authentication > URL Configuration
+   - Set the Site URL to your production domain
+   - Add your domain to the Redirect URLs (include both `/auth/callback` and `/` paths)
+
+7. Update OAuth Provider Redirect URIs:
+   - For each OAuth provider (Google, GitHub, etc.), update the redirect URI in their developer consoles to point to your production Supabase URL: `https://your-project.supabase.co/auth/v1/callback`
+
+### Important Deployment Notes
+
+1. **Email Verification**: Ensure Supabase email templates are properly configured for production.
+
+2. **Social Login**: Verify that all OAuth providers have the correct production redirect URLs.
+
+3. **Security Headers**: The Vercel deployment includes security headers configured in `vercel.json`.
+
+4. **Performance Optimizations**: The build is configured to split code into chunks for better performance.
+
+5. **Authentication Flow**: Test the complete authentication flow after deployment to ensure everything works correctly.
+
+## Troubleshooting Deployment
+
+- **Blank Page**: Check if environment variables are properly configured
+- **Authentication Errors**: Verify OAuth redirect URIs and Supabase URL configuration
+- **API Errors**: Ensure Supabase permissions are properly configured
+- **Route Not Found**: The application uses client-side routing, so verify the Vercel configuration includes proper rewrites
+
+## Contact
+
+For support with deployment, contact us at support@inventorypro-cloud.com 
