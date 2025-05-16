@@ -10,6 +10,8 @@ interface CSVRow {
   price: string;
   quantity: string;
   minimum_quantity: string;
+  category?: string;
+  location?: string;
 }
 
 const ImportCSV: React.FC = () => {
@@ -61,9 +63,12 @@ const ImportCSV: React.FC = () => {
         name: row.name,
         sku: row.sku,
         description: row.description || '',
-        price: parseFloat(row.price),
-        quantity: parseInt(row.quantity),
+        cost_price: parseFloat(row.price),
+        selling_price: parseFloat(row.price),
+        stock: parseInt(row.quantity),
         minimum_quantity: parseInt(row.minimum_quantity),
+        category: row.category || 'Uncategorized',
+        location: row.location || 'Default',
       }));
 
       // Import products in batches
@@ -81,7 +86,7 @@ const ImportCSV: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-2 sm:p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Import Products from CSV</h1>
 
       {error && (
@@ -90,12 +95,12 @@ const ImportCSV: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-lg shadow">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Upload CSV File
           </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+          <div className="mt-1 flex flex-col sm:flex-row justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md gap-2">
             <div className="space-y-1 text-center">
               <svg
                 className="mx-auto h-12 w-12 text-gray-400"
@@ -111,7 +116,7 @@ const ImportCSV: React.FC = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-              <div className="flex text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row text-sm text-gray-600 items-center justify-center gap-2">
                 <label
                   htmlFor="file-upload"
                   className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
@@ -173,11 +178,11 @@ const ImportCSV: React.FC = () => {
           </>
         )}
 
-        <div className="mt-6 flex justify-end space-x-3">
+        <div className="mt-6 flex flex-col xs:flex-row justify-end gap-2 xs:space-x-3 w-full">
           <button
             type="button"
             onClick={() => navigate('/products')}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full xs:w-auto"
           >
             Cancel
           </button>
@@ -185,7 +190,7 @@ const ImportCSV: React.FC = () => {
             type="button"
             onClick={handleImport}
             disabled={loading || !preview.length}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 w-full xs:w-auto"
           >
             {loading ? 'Importing...' : 'Import Products'}
           </button>

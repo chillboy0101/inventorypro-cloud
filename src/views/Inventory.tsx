@@ -14,11 +14,17 @@ import {
 } from '@heroicons/react/24/outline';
 import { Product } from '../store/types';
 import InventoryHistory from '../components/InventoryHistory';
+import RemoveSerialsModal from '../components/RemoveSerialsModal';
+import Orders from '../views/Orders';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { getStockStatus } from '../utils/stockStatus';
 
 const Inventory = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { items: products, loading, error } = useSelector((state: RootState) => state.inventory);
   const settings = useSelector((state: RootState) => state.settings);
+  const navigate = useNavigate();
   
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
@@ -31,6 +37,8 @@ const Inventory = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [isAdjusting, setIsAdjusting] = useState(false);
+  const [showRemoveSerials, setShowRemoveSerials] = useState(false);
+  const [orderModalId, setOrderModalId] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchProducts());
@@ -78,13 +86,12 @@ const Inventory = () => {
       setScanError('Please select a product');
       return;
     }
-
     if (!adjustmentReason.trim()) {
       setScanError('Please provide a reason for the adjustment');
       return;
     }
 
-    const newStock = adjustmentType === 'in' 
+    const newStock = adjustmentType === 'in'
       ? selectedProduct.stock + adjustmentQuantity
       : selectedProduct.stock - adjustmentQuantity;
 
@@ -93,36 +100,73 @@ const Inventory = () => {
       return;
     }
 
+    // Handle serialized products
+    if (selectedProduct.is_serialized) {
+      // For stock increase, redirect to Serial Number Manager
+      if (newStock > selectedProduct.stock) {
+        // Store the adjustment reason in localStorage
+        localStorage.setItem('adjustmentReason', adjustmentReason.trim());
+        setIsAddStockModalOpen(false);
+        navigate(`/products?manageSerialsFor=${selectedProduct.id}`);
+        return;
+      }
+      
+      // For stock decrease, show RemoveSerialsModal
+      if (newStock < selectedProduct.stock) {
+        // Store the adjustment reason in localStorage
+        localStorage.setItem('adjustmentReason', adjustmentReason.trim());
+        setShowRemoveSerials(true);
+        setIsAddStockModalOpen(false);
+        return;
+      }
+    }
+
+    // For non-serialized products or no stock change
     try {
       setIsAdjusting(true);
       await dispatch(updateProduct({
         id: selectedProduct.id,
         stock: newStock,
+        adjustment_reason: adjustmentReason.trim()
       })).unwrap();
-      
       handleCloseModal();
     } catch (error) {
       console.error('Failed to adjust stock:', error);
-      setScanError('Failed to adjust stock. Please try again.');
+      setScanError(error instanceof Error ? error.message : 'Failed to adjust stock. Please try again.');
     } finally {
       setIsAdjusting(false);
     }
   };
 
-  const getStockStatus = (stock: number, reorderLevel: number): 'In Stock' | 'Low Stock' | 'Out of Stock' => {
-    // Get the global low stock threshold from settings
-    const globalThreshold = settings.lowStockThreshold || 5;
-    
-    // Use the product-specific reorder level if set, otherwise fall back to global threshold
-    const effectiveThreshold = reorderLevel > 0 ? reorderLevel : globalThreshold;
-    
-    if (stock === 0) return 'Out of Stock';
-    if (stock <= effectiveThreshold) return 'Low Stock';
-    return 'In Stock';
+  const handleSerialsRemoved = async () => {
+    setShowRemoveSerials(false);
+    if (selectedProduct) {
+      setIsAdjusting(true);
+      try {
+        // Fetch the new count of available serials
+        const { data: serials, error: serialsError } = await supabase
+          .from('serial_numbers')
+          .select('id')
+          .eq('product_id', selectedProduct.id)
+          .eq('status', 'available');
+        if (serialsError) throw serialsError;
+        const newStock = serials ? serials.length : 0;
+        await dispatch(updateProduct({
+          id: selectedProduct.id,
+          stock: newStock,
+          adjustment_reason: adjustmentReason.trim() || 'Stock adjusted after serial removal'
+        })).unwrap();
+        handleCloseModal();
+      } catch (error) {
+        setScanError(error instanceof Error ? error.message : 'Failed to adjust stock. Please try again.');
+      } finally {
+        setIsAdjusting(false);
+      }
+    }
   };
 
   const getStatusBadge = (stock: number, reorderLevel: number) => {
-    const status = getStockStatus(stock, reorderLevel);
+    const status = getStockStatus(stock, reorderLevel, settings.lowStockThreshold || 5);
     const styles = {
       'In Stock': 'bg-green-100 text-green-800',
       'Low Stock': 'bg-yellow-100 text-yellow-800',
@@ -157,7 +201,7 @@ const Inventory = () => {
     const matchesWarehouse = filterLocation === '' || filterLocation === 'All Warehouses' || 
       (product.location && product.location.startsWith(filterLocation));
     
-    const status = getStockStatus(product.stock, product.reorder_level || 0);
+    const status = getStockStatus(product.stock, product.reorder_level || 0, settings.lowStockThreshold || 5);
     const matchesStatus = filterCategory === '' || filterCategory === 'All Status' || status === filterCategory;
     
     // Search filter
@@ -229,16 +273,14 @@ const Inventory = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       {/* Header */}
-      <div className="sm:flex sm:items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">Inventory</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            A list of all products in your inventory including their location, stock levels, and value.
-          </p>
+          <p className="mt-2 text-sm text-gray-700">A list of all products in your inventory including their location, stock levels, and value.</p>
         </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none flex flex-wrap gap-2">
+        <div className="flex flex-col xs:flex-row flex-wrap gap-2 w-full sm:w-auto">
           <UnifiedBarcodeScanner 
             buttonText="Scan Barcode"
             onComplete={() => dispatch(fetchProducts())}
@@ -246,7 +288,7 @@ const Inventory = () => {
           <button
             type="button"
             onClick={handleAddStock}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full xs:w-auto"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
             Add Stock
@@ -254,7 +296,7 @@ const Inventory = () => {
           <button
             type="button"
             onClick={handleClearAllInventory}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 w-full xs:w-auto"
           >
             <ExclamationTriangleIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
             Clear All
@@ -285,36 +327,81 @@ const Inventory = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 >
                   <option value="">Select a product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} (Current Stock: {product.stock})
-                    </option>
-                  ))}
+                  {products
+                    .filter(product =>
+                      !product.id.startsWith('GHOST-') &&
+                      !product.name.startsWith('[DELETED]') &&
+                      !product.sku.startsWith('DELETED-')
+                    )
+                    .map(product => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} (Current Stock: {product.stock})
+                      </option>
+                    ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Adjustment Type</label>
-                <select
-                  value={adjustmentType}
-                  onChange={(e) => setAdjustmentType(e.target.value as 'in' | 'out')}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                >
-                  <option value="in">Add Stock</option>
-                  <option value="out">Remove Stock</option>
-                </select>
-              </div>
+              {/* Only show adjustment type and quantity for non-serialized products */}
+              {!selectedProduct?.is_serialized && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Adjustment Type</label>
+                    <select
+                      value={adjustmentType}
+                      onChange={(e) => setAdjustmentType(e.target.value as 'in' | 'out')}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="in">Add Stock</option>
+                      <option value="out">Remove Stock</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={adjustmentQuantity}
+                      onChange={(e) => setAdjustmentQuantity(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={adjustmentQuantity}
-                  onChange={(e) => setAdjustmentQuantity(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
+              {/* For serialized products, show only the serial number management options, grouped visually */}
+              {selectedProduct?.is_serialized && (
+                <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <div className="mb-2 text-sm font-semibold text-blue-900 flex items-center gap-4">
+                    <span>Current Stock: <b>{selectedProduct.stock}</b></span>
+                    <span className="text-xs text-blue-700">Available Serials: <b>{selectedProduct.stock}</b></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-2">
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium shadow"
+                      onClick={() => {
+                        setIsAddStockModalOpen(false);
+                        navigate(`/products?manageSerialsFor=${selectedProduct.id}`);
+                      }}
+                    >
+                      + Add Serial Numbers
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium shadow"
+                      onClick={() => {
+                        setShowRemoveSerials(true);
+                        setIsAddStockModalOpen(false);
+                      }}
+                    >
+                      – Remove Serial Numbers
+                    </button>
+                  </div>
+                  <div className="text-xs text-blue-700">
+                    <b>Tip:</b> You can paste, type, or scan multiple serials at once when adding. Use the checkboxes and search to quickly select serials for removal.
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Reason</label>
@@ -362,8 +449,23 @@ const Inventory = () => {
         </div>
       )}
 
+      {showRemoveSerials && selectedProduct && (
+        <RemoveSerialsModal
+          productId={selectedProduct.id}
+          onDone={handleSerialsRemoved}
+          onClose={() => setShowRemoveSerials(false)}
+        />
+      )}
+
+      {orderModalId && (
+        <Orders
+          initialOrderId={orderModalId}
+          onClose={() => setOrderModalId(null)}
+        />
+      )}
+
       {/* Filters */}
-      <div className="mt-4 flex flex-wrap gap-4">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-4">
         {/* Search Field */}
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -383,7 +485,7 @@ const Inventory = () => {
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
           <select
             value={filterLocation}
             onChange={(e) => {
@@ -428,8 +530,8 @@ const Inventory = () => {
       </div>
 
       {/* Table */}
-      <div className="mt-6 overflow-hidden border border-gray-200 rounded-lg">
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+      <div className="mt-6 overflow-x-auto">
+        <div className="min-w-[700px] md:min-w-full overflow-hidden border border-gray-200 rounded-lg shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
           <table className="min-w-full divide-y divide-gray-300">
             <thead className="bg-gray-50">
               <tr>

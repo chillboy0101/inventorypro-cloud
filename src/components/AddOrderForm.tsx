@@ -5,6 +5,7 @@ import { createOrder } from '../store/slices/ordersSlice';
 import { fetchProducts } from '../store/slices/inventorySlice';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Product } from '../store/types';
+import { supabase } from '../lib/supabase';
 
 interface AddOrderFormProps {
   onClose: () => void;
@@ -14,6 +15,7 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   price: number;
+  serial_numbers?: string[];
 }
 
 export default function AddOrderForm({ onClose }: AddOrderFormProps) {
@@ -25,6 +27,9 @@ export default function AddOrderForm({ onClose }: AddOrderFormProps) {
   const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serialModal, setSerialModal] = useState<{productId: string, quantity: number, onDone: (serials: string[]) => void} | null>(null);
+  const [serialOptions, setSerialOptions] = useState<{id: string, serial_number: string}[]>([]);
+  const [selectedSerials, setSelectedSerials] = useState<string[]>([]);
 
   useEffect(() => {
     dispatch(fetchProducts());
@@ -64,21 +69,41 @@ export default function AddOrderForm({ onClose }: AddOrderFormProps) {
     return null;
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!selectedProduct) {
       setError('Please select a product');
+      return;
+    }
+    const product = products.find(p => p.id === selectedProduct);
+    if (!product) {
+      setError('Selected product not found');
+      return;
+    }
+    if (product.is_serialized) {
+      // Fetch available serials
+      const { data } = await supabase.from('serial_numbers').select('id, serial_number').eq('product_id', product.id).eq('status', 'available');
+      setSerialOptions(data || []);
+      setSelectedSerials([]);
+      setSerialModal({ productId: product.id, quantity, onDone: (serials) => {
+        // Add item with serials
+        const newItem: OrderItem = {
+          product_id: product.id,
+          quantity,
+          price: typeof product.selling_price === 'number' ? product.selling_price : 0,
+          serial_numbers: serials
+        };
+        setItems(prev => [...prev, newItem]);
+        setSerialModal(null);
+        setSelectedProduct('');
+        setQuantity(1);
+        setError(null);
+      }});
       return;
     }
 
     const quantityError = validateQuantity(selectedProduct, quantity);
     if (quantityError) {
       setError(quantityError);
-      return;
-    }
-
-    const product = products.find(p => p.id === selectedProduct);
-    if (!product) {
-      setError('Selected product not found');
       return;
     }
 
@@ -94,7 +119,7 @@ export default function AddOrderForm({ onClose }: AddOrderFormProps) {
       const newItem: OrderItem = {
         product_id: product.id,
         quantity,
-        price: product.selling_price
+        price: typeof product.selling_price === 'number' ? product.selling_price : 0
       };
       setItems(prev => [...prev, newItem]);
     }
@@ -229,21 +254,24 @@ export default function AddOrderForm({ onClose }: AddOrderFormProps) {
                   );
                 })}
               </select>
-              <input
-                type="number"
-                min="1"
-                max={selectedProduct ? 
-                  products.find(p => p.id === selectedProduct)?.stock - 
-                  (items.find(item => item.product_id === selectedProduct)?.quantity || 0) 
-                  : 1}
-                value={quantity}
-                onChange={(e) => {
-                  setQuantity(parseInt(e.target.value) || 0);
-                  setError(null);
-                }}
-                className="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Qty"
-              />
+              {(() => {
+                const product = products.find(p => p.id === selectedProduct);
+                const maxQty = product ? product.stock - (items.find(item => item.product_id === selectedProduct)?.quantity || 0) : 1;
+                return (
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxQty}
+                    value={quantity}
+                    onChange={(e) => {
+                      setQuantity(parseInt(e.target.value) || 0);
+                      setError(null);
+                    }}
+                    className="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Qty"
+                  />
+                );
+              })()}
               <button
                 type="button"
                 onClick={handleAddItem}
@@ -351,6 +379,45 @@ export default function AddOrderForm({ onClose }: AddOrderFormProps) {
             </button>
           </div>
         </form>
+
+        {serialModal !== null && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-medium mb-2">Select Serial Numbers</h3>
+              <p className="mb-2 text-sm text-gray-600">Select {serialModal.quantity} serial number(s):</p>
+              <div className="mb-4 max-h-48 overflow-y-auto">
+                {serialOptions.map(opt => (
+                  <label key={opt.id} className="flex items-center space-x-2 mb-1">
+                    <input
+                      type="checkbox"
+                      value={opt.id}
+                      checked={selectedSerials.includes(opt.id)}
+                      onChange={e => {
+                        if (e.target.checked && selectedSerials.length < serialModal.quantity) {
+                          setSelectedSerials([...selectedSerials, opt.id]);
+                        } else if (!e.target.checked) {
+                          setSelectedSerials(selectedSerials.filter(id => id !== opt.id));
+                        }
+                      }}
+                      disabled={!selectedSerials.includes(opt.id) && selectedSerials.length >= serialModal.quantity}
+                    />
+                    <span>{opt.serial_number}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button onClick={() => setSerialModal(null)} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+                <button
+                  onClick={() => serialModal.onDone(selectedSerials)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+                  disabled={selectedSerials.length !== serialModal.quantity}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { AppDispatch, RootState } from '../store';
 import { createProduct, fetchCategories, fetchLocations, addCategory, addLocation } from '../store/slices/inventorySlice';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { Database } from '../types/supabase';
+import type { Product } from '../store/types';
 
 interface AddProductFormProps {
   onClose: () => void;
@@ -16,13 +17,19 @@ interface AddProductFormProps {
     cost_price?: number;
     selling_price?: number;
   };
+  onProductCreated?: (product: Product) => void;
 }
 
-type ProductFormData = Required<Omit<Database['public']['Tables']['products']['Insert'], 'id' | 'created_at' | 'updated_at'>> & {
+type ProductFormData = Omit<Database['public']['Tables']['products']['Insert'], 'id' | 'created_at' | 'updated_at'> & {
   description: string;
+  is_serialized: boolean;
+  cost_price: string | number;
+  selling_price: string | number;
+  stock: number;
+  reorder_level: number;
 };
 
-const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '', initialProductData = {} }) => {
+const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '', initialProductData = {}, onProductCreated }) => {
   const dispatch = useDispatch<AppDispatch>();
   const categories = useSelector((state: RootState) => state.inventory.categories);
   const locations = useSelector((state: RootState) => state.inventory.locations);
@@ -50,7 +57,8 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
     location: initialProductData.location || '',
     reorder_level: 10,
     custom_icon: '',
-    custom_icon_type: 'default'
+    custom_icon_type: 'default',
+    is_serialized: false
   });
 
   useEffect(() => {
@@ -75,6 +83,11 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
     }
   }, [formData.category, formData.name, products, initialSku]);
 
+  const formatInteger = (value: string) => {
+    // Remove leading zeros, allow only numbers
+    return value.replace(/^0+(?=\d)/, '').replace(/[^\d]/g, '');
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
@@ -87,6 +100,53 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
       return newData;
     });
     setError(null);
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    // Remove leading zero if present and not immediately followed by a dot
+    let cleaned = value.replace(/^0+(?!\.)/, '');
+    // Allow only numbers and dot
+    cleaned = cleaned.replace(/[^\d.]/g, '');
+    setFormData(prev => ({
+      ...prev,
+      [name]: cleaned
+    }));
+  };
+
+  const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (value === '' || value === '0' || value === '0.00') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    } else {
+      let num = parseFloat(value);
+      if (isNaN(num)) num = 0;
+      setFormData(prev => ({
+        ...prev,
+        [name]: num.toFixed(2)
+      }));
+    }
+  };
+
+  const handlePriceFocus = () => {};
+
+  const handleStockChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      stock: parseInt(formatInteger(value)) || 0
+    }));
+  };
+
+  const handleReorderLevelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      reorder_level: parseInt(formatInteger(value)) || 0
+    }));
   };
 
   const handleNewCategorySubmit = (e: React.FormEvent) => {
@@ -114,9 +174,11 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
     if (!formData.sku.trim()) return 'SKU is required';
     if (!formData.category.trim()) return 'Category is required';
     if (!formData.location.trim()) return 'Location is required';
-    if (formData.cost_price <= 0) return 'Cost price must be greater than 0';
-    if (formData.selling_price <= 0) return 'Selling price must be greater than 0';
-    if (formData.selling_price <= formData.cost_price) return 'Selling price must be greater than cost price';
+    const costPrice = typeof formData.cost_price === 'string' ? parseFloat(formData.cost_price) || 0 : formData.cost_price;
+    const sellingPrice = typeof formData.selling_price === 'string' ? parseFloat(formData.selling_price) || 0 : formData.selling_price;
+    if (costPrice <= 0) return 'Cost price must be greater than 0';
+    if (sellingPrice <= 0) return 'Selling price must be greater than 0';
+    if (sellingPrice <= costPrice) return 'Selling price must be greater than cost price';
     if (formData.stock < 0) return 'Stock cannot be negative';
     if (formData.reorder_level < 0) return 'Reorder level cannot be negative';
     return null;
@@ -135,10 +197,14 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
     setError(null);
 
     try {
-      await dispatch(createProduct({
+      const result = await dispatch(createProduct({
         ...formData,
+        cost_price: typeof formData.cost_price === 'string' ? parseFloat(formData.cost_price) || 0 : formData.cost_price,
+        selling_price: typeof formData.selling_price === 'string' ? parseFloat(formData.selling_price) || 0 : formData.selling_price,
         description: formData.description || null
       })).unwrap();
+      
+      if (onProductCreated) onProductCreated(result);
       onClose();
     } catch (error) {
       console.error('Failed to create product:', error);
@@ -150,7 +216,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-medium text-gray-900">Add New Product</h2>
           <button
@@ -319,13 +385,13 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
                 Stock
               </label>
               <input
-                type="number"
+                type="text"
                 id="stock"
                 name="stock"
-                value={formData.stock}
-                onChange={handleChange}
+                value={formData.stock === 0 ? '' : formData.stock}
+                onChange={handleStockChange}
                 min="0"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 required
               />
             </div>
@@ -334,19 +400,20 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
               <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700">
                 Cost Price
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                 <input
-                  type="number"
+                  type="text"
                   id="cost_price"
                   name="cost_price"
                   min="0"
                   step="0.01"
-                  value={formData.cost_price}
-                  onChange={handleChange}
-                  className="mt-1 block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="0.00"
+                  value={typeof formData.cost_price === 'number' ? (formData.cost_price === 0 ? '' : formData.cost_price) : (formData.cost_price === '' ? '' : formData.cost_price)}
+                  onChange={handlePriceChange}
+                  onBlur={handlePriceBlur}
+                  onFocus={handlePriceFocus}
+                  className="mt-1 block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
                 />
               </div>
@@ -357,26 +424,25 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
               <label htmlFor="selling_price" className="block text-sm font-medium text-gray-700">
                 Selling Price
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                 <input
-                  type="number"
+                  type="text"
                   id="selling_price"
                   name="selling_price"
                   min="0"
                   step="0.01"
-                  value={formData.selling_price}
-                  onChange={handleChange}
-                  className={`mt-1 block w-full pl-7 border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    formData.selling_price <= formData.cost_price ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  placeholder="0.00"
+                  value={typeof formData.selling_price === 'number' ? (formData.selling_price === 0 ? '' : formData.selling_price) : (formData.selling_price === '' ? '' : formData.selling_price)}
+                  onChange={handlePriceChange}
+                  onBlur={handlePriceBlur}
+                  onFocus={handlePriceFocus}
+                  className={`mt-1 block w-full pl-7 border rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${Number(typeof formData.selling_price === 'number' ? formData.selling_price : parseFloat(formData.selling_price)) <= Number(typeof formData.cost_price === 'number' ? formData.cost_price : parseFloat(formData.cost_price)) ? 'border-red-300' : 'border-gray-300'}`}
                   required
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">The price customers will pay for the product</p>
-              {formData.selling_price <= formData.cost_price && (
+              {Number(typeof formData.selling_price === 'number' ? formData.selling_price : parseFloat(formData.selling_price)) <= Number(typeof formData.cost_price === 'number' ? formData.cost_price : parseFloat(formData.cost_price)) && (
                 <p className="mt-1 text-xs text-red-500">
                   Selling price should be higher than cost price for profit
                 </p>
@@ -388,13 +454,13 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
                 Reorder Level
               </label>
               <input
-                type="number"
+                type="text"
                 id="reorder_level"
                 name="reorder_level"
-                value={formData.reorder_level}
-                onChange={handleChange}
+                value={formData.reorder_level === 0 ? '' : formData.reorder_level}
+                onChange={handleReorderLevelChange}
                 min="0"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 required
               />
             </div>
@@ -413,6 +479,27 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onClose, initialSku = '
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="is_serialized"
+              checked={formData.is_serialized}
+              onChange={(e) => setFormData({ ...formData, is_serialized: e.target.checked })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="is_serialized" className="block text-sm font-medium text-gray-700">
+              This product requires serial numbers
+            </label>
+          </div>
+
+          {formData.is_serialized && (
+            <div className="bg-blue-50 p-4 rounded-md">
+              <p className="text-sm text-blue-700">
+                Serial numbers will be required for each unit of this product. You'll be able to add serial numbers after creating the product.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3">
             <button

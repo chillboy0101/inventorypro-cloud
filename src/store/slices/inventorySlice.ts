@@ -72,6 +72,8 @@ export const updateProduct = createAsyncThunk(
   'inventory/updateProduct',
   async (updates: Partial<Product> & { id: string }) => {
     const { id, ...rest } = updates;  // Just extract id and use rest for updates
+    // Remove adjustment_reason from the product update payload
+    const { adjustment_reason, ...productUpdates } = rest;
 
     // First get the current product
     const { data: currentProduct, error: fetchError } = await supabase
@@ -83,10 +85,34 @@ export const updateProduct = createAsyncThunk(
     if (fetchError) throw fetchError;
     if (!currentProduct) throw new Error('Product not found');
 
-    // Update the product without the value field
+    // If stock is being updated for a serialized product
+    if (currentProduct.is_serialized && rest.stock !== undefined) {
+      // Get current available serial numbers
+      const { data: availableSerials, error: serialsError } = await supabase
+        .from('serial_numbers')
+        .select('id')
+        .eq('product_id', id)
+        .eq('status', 'available');
+
+      if (serialsError) throw serialsError;
+
+      const currentAvailableCount = availableSerials?.length || 0;
+
+      // If reducing stock, ensure we have enough serials to remove
+      if (rest.stock < currentAvailableCount) {
+        throw new Error(`Cannot reduce stock below ${currentAvailableCount} (number of available serial numbers)`);
+      }
+
+      // If increasing stock, we need to add serial numbers
+      if (rest.stock > currentAvailableCount) {
+        throw new Error('Please use the Serial Number Manager to add new serial numbers');
+      }
+    }
+
+    // Update the product
     const { data, error } = await supabase
       .from('products')
-      .update(rest)
+      .update(productUpdates)
       .eq('id', id)
       .select()
       .single();
@@ -106,8 +132,7 @@ export const updateProduct = createAsyncThunk(
         .limit(1);
 
       if (lastAdjError) {
-        console.error('Error fetching last adjustment:', lastAdjError);
-        return data;
+        throw new Error(`Failed to fetch last adjustment: ${lastAdjError.message}`);
       }
 
       // Generate next adjustment ID
@@ -125,13 +150,18 @@ export const updateProduct = createAsyncThunk(
           product_id: id,
           quantity: adjustmentQuantity,
           adjustment_type: adjustmentType,
-          reason: 'Manual stock update',
+          reason: adjustment_reason || 'Manual stock update',
           previous_quantity: currentProduct.stock,
           new_quantity: rest.stock
         });
 
       if (adjustmentError) {
-        console.error('Error creating stock adjustment:', adjustmentError);
+        // If stock adjustment fails, rollback the product update
+        await supabase
+          .from('products')
+          .update({ stock: currentProduct.stock })
+          .eq('id', id);
+        throw new Error(`Failed to create stock adjustment: ${adjustmentError.message}`);
       }
     }
 
@@ -277,7 +307,8 @@ export const createProduct = createAsyncThunk(
       cost_price: product.cost_price,
       selling_price: product.selling_price,
       location: product.location,
-      reorder_level: product.reorder_level || 0
+      reorder_level: product.reorder_level || 0,
+      is_serialized: product.is_serialized || false
     };
 
     const { data, error } = await supabase

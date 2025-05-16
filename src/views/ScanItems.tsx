@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
 import { updateProduct } from '../store/slices/inventorySlice';
 import { BarcodeScanner } from '../components/BarcodeScanner';
+import { Product } from '../store/types';
 
 const ScanItems: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,7 +38,7 @@ const ScanItems: React.FC = () => {
       setIsSubmitting(true);
       await dispatch(updateProduct({
         id: product.id,
-        quantity: product.quantity + quantity
+        stock: (product.stock || 0) + quantity
       })).unwrap();
       
       setMessage({ type: 'success', text: `Added ${quantity} units to ${product.name}` });
@@ -68,7 +69,10 @@ const ScanItems: React.FC = () => {
 
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <BarcodeScanner onScan={handleScan} />
+          <BarcodeScanner
+            onScan={handleScan}
+            buttonText="Scan Product"
+          />
 
           <div className="mt-8">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Manual Entry</h3>

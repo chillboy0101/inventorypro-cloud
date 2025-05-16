@@ -4,7 +4,6 @@ import type { Database } from '../../types/supabase';
 
 type StockAdjustment = Database['public']['Tables']['stock_adjustments']['Row'];
 type StockAdjustmentInsert = Database['public']['Tables']['stock_adjustments']['Insert'];
-type StockAdjustmentUpdate = Database['public']['Tables']['stock_adjustments']['Update'];
 
 export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
   constructor() {
@@ -41,9 +40,9 @@ export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
     if (!product) throw new Error('Product not found');
 
     // Calculate new quantity
-    const newQuantity = adjustment.type === 'in'
-      ? product.quantity + adjustment.quantity
-      : product.quantity - adjustment.quantity;
+    const newQuantity = adjustment.adjustment_type === 'in'
+      ? product.stock + adjustment.quantity
+      : product.stock - adjustment.quantity;
 
     if (newQuantity < 0) {
       throw new Error('Insufficient stock');
@@ -52,7 +51,14 @@ export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
     // Create the adjustment record
     const { data: newAdjustment, error: adjustmentError } = await supabase
       .from(this.table)
-      .insert(adjustment)
+      .insert({
+        product_id: adjustment.product_id,
+        quantity: adjustment.quantity,
+        adjustment_type: adjustment.adjustment_type,
+        reason: adjustment.reason,
+        previous_quantity: product.stock,
+        new_quantity: newQuantity
+      })
       .select()
       .single();
 
@@ -61,7 +67,7 @@ export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
     // Update product quantity
     const { error: updateError } = await supabase
       .from('products')
-      .update({ quantity: newQuantity })
+      .update({ stock: newQuantity })
       .eq('id', adjustment.product_id);
 
     if (updateError) {
@@ -114,7 +120,7 @@ export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
     return data;
   }
 
-  async getByType(type: 'in' | 'out') {
+  async getByType(adjustment_type: 'in' | 'out') {
     const { data, error } = await supabase
       .from(this.table)
       .select(`
@@ -122,11 +128,11 @@ export class StockAdjustmentsApi extends BaseApi<'stock_adjustments'> {
         product: products (
           name,
           sku,
-          quantity,
-          minimum_quantity
+          stock,
+          reorder_level
         )
       `)
-      .eq('type', type)
+      .eq('adjustment_type', adjustment_type)
       .order('created_at', { ascending: false });
 
     if (error) throw error;

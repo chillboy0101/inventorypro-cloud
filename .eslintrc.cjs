@@ -12,7 +12,7 @@ module.exports = {
   rules: {
     'react-refresh/only-export-components': [
       'warn',
-      { allowConstantExports: true },
+      { allowConstantExport: true },
     ],
   },
 } 

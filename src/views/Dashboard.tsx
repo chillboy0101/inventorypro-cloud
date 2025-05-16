@@ -134,7 +134,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
       
       {/* Stats Overview */}
@@ -212,204 +212,94 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Inventory Trends Chart */}
+      {/* Low Stock Items - horizontally scrollable on mobile */}
       <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Inventory Trends</h2>
-        <div className="bg-white shadow rounded-lg p-6">
-          <InventoryTrends />
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Low Stock Items</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-[400px] sm:min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reorder Level</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {lowStockItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-2 text-center text-gray-500">No low stock items</td>
+                </tr>
+              ) : (
+                lowStockItems.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{item.sku}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{item.stock}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{item.reorder_level}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{item.location}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Recent Orders - horizontally scrollable on mobile */}
       <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Import CSV Card */}
-          <Link
-            to="/import"
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <DocumentArrowUpIcon className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">Import CSV</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Import products from a CSV file
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* Add Product Card */}
-          <Link
-            to="/products"
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <QrCodeIcon className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">Add Product</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Add a new product to inventory
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* Stock Adjustments Card */}
-          <Link
-            to="/inventory"
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <ArrowsUpDownIcon className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">Stock Adjustments</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Adjust inventory stock levels
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* Generate Report Card */}
-          <button
-            onClick={handleGenerateReport}
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 text-left"
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <DocumentChartBarIcon className="h-6 w-6 text-yellow-600" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">Generate Report</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Download inventory report
-                  </p>
-                </div>
-              </div>
-            </div>
-          </button>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Recent Orders</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-[400px] sm:min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {recentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-2 text-center text-gray-500">No recent orders</td>
+                </tr>
+              ) : (
+                recentOrders.map((order, idx) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{order.id}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{order.customer}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{order.status}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{formatPrice(order.total_amount)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{new Date(order.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Orders */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="p-6">
-            <h2 className="text-lg font-medium text-gray-900">Recent Orders</h2>
-            <div className="mt-4">
-              {recentOrders.length > 0 ? (
-                <div className="flow-root">
-                  <ul className="-my-5 divide-y divide-gray-200">
-                    {recentOrders.map((order) => (
-                      <li key={order.id} className="py-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              Order #{order.id}
-                            </p>
-                            <p className="text-sm text-gray-500 truncate">
-                              {order.customer} - {formatPrice(order.total_amount)}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {new Date(order.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div>
-                            <span className={`
-                              inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                              ${order.status === 'delivered' ? 'bg-green-100 text-green-800' : ''}
-                              ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
-                              ${order.status === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
-                              ${order.status === 'processing' ? 'bg-blue-100 text-blue-800' : ''}
-                              ${order.status === 'shipped' ? 'bg-purple-100 text-purple-800' : ''}
-                            `}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </span>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No recent orders</p>
-              )}
-              <div className="mt-6">
-                <Link
-                  to="/orders"
-                  className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  View All Orders
-                </Link>
-              </div>
-            </div>
+      {/* Inventory Trends Chart - horizontally scrollable on mobile */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Inventory Trends</h2>
+        <div className="overflow-x-auto">
+          <div className="min-w-[350px] sm:min-w-0">
+            <InventoryTrends />
           </div>
         </div>
+      </div>
 
-        {/* Low Stock Items */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="p-6">
-            <h2 className="text-lg font-medium text-gray-900">Low Stock Items</h2>
-            <div className="mt-4">
-              {lowStockItems.length > 0 ? (
-                <div className="flow-root">
-                  <ul className="-my-5 divide-y divide-gray-200">
-                    {lowStockItems.map((item) => (
-                      <li key={item.id} className="py-4">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-shrink-0">
-                            <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {item.name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              Current Stock: {item.stock} (Min: {item.reorder_level})
-                            </p>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">No low stock items</p>
-              )}
-              <div className="mt-6">
-                <Link
-                  to="/inventory"
-                  className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  View Inventory
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Generate Report Button */}
+      <div className="mt-8 flex flex-col xs:flex-row justify-end gap-2 xs:space-x-3 w-full">
+        <button
+          onClick={handleGenerateReport}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full xs:w-auto"
+        >
+          Generate Inventory Report
+        </button>
       </div>
     </div>
   );

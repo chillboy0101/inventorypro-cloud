@@ -64,6 +64,18 @@ export default function Login() {
     const email = params.get('email');
     const verificationEmail = localStorage.getItem('verification_email');
     
+    // Check if this is a password reset return
+    const isPasswordReset = window.location.href.includes('reset-password') || 
+                           params.has('type') && params.get('type') === 'recovery';
+    
+    // Skip this entire effect for social logins or password reset flows
+    if (sessionStorage.getItem('isSocialLogin') === 'true' || 
+        sessionStorage.getItem('authProvider') ||
+        isPasswordReset) {
+      console.log('[Login] Social login or password reset detected, skipping verification handling');
+      return;
+    }
+    
     if (verified === 'true' || sessionStorage.getItem('showing_verification_success') === 'true') {
       // Force logout on arrival from verification to ensure no lingering session
       const ensureLoggedOut = async () => {
@@ -179,6 +191,8 @@ export default function Login() {
       sessionStorage.setItem('authProvider', provider);
       sessionStorage.setItem('isSocialLogin', 'true');
       
+      console.log(`[Login] Starting ${provider} social login flow`);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -187,20 +201,29 @@ export default function Login() {
             access_type: 'offline',
             prompt: 'consent',
             // Add special marker for social login detection
-            provider_type: 'social'
+            provider_type: 'social',
+            // Make it clearer that this is a social login
+            social_auth: 'true'
           },
         },
       });
 
       if (error) {
+        console.error(`[Login] ${provider} login error:`, error.message);
         throw error;
       }
 
       if (data?.url) {
-        // Add social login marker to URL
+        // Add social login marker to URL if not already present
         const url = new URL(data.url);
-        url.searchParams.append('social_auth', 'true');
+        if (!url.searchParams.has('social_auth')) {
+          url.searchParams.append('social_auth', 'true');
+        }
+        console.log(`[Login] Redirecting to ${provider} auth URL`);
         window.location.href = url.toString();
+      } else {
+        console.error('[Login] No redirect URL provided by Supabase');
+        throw new Error('Authentication service unavailable');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
@@ -311,11 +334,11 @@ export default function Login() {
 
       {/* Right side - Login form */}
       <motion.div 
-        className="flex-1 flex items-center justify-center p-8 bg-gray-50"
+        className="flex-1 flex items-center justify-center p-2 sm:p-8 bg-gray-50"
         variants={animations.fadeIn}
       >
         <motion.div 
-          className="w-full max-w-md"
+          className="w-full max-w-xs sm:max-w-md"
           variants={staggerChildren}
         >
           <motion.div 
@@ -391,147 +414,53 @@ export default function Login() {
             )}
           </AnimatePresence>
 
-          <motion.div 
-            className="space-y-3 mb-6"
-            variants={staggerChildren}
-          >
-            <motion.div variants={animations.fadeIn}>
-            <SocialLoginButton
-              provider="google"
-              onClick={() => handleSocialLogin('google')}
-              loading={socialLoading === 'google'}
-            />
-            </motion.div>
-            <motion.div variants={animations.fadeIn}>
-              <AppleSignInButton />
-            </motion.div>
-            <motion.div variants={animations.fadeIn}>
-            <SocialLoginButton
-              provider="github"
-              onClick={() => handleSocialLogin('github')}
-              loading={socialLoading === 'github'}
-            />
-            </motion.div>
-          </motion.div>
-
-          <motion.div 
-            className="relative mb-6"
-            variants={animations.fadeIn}
-          >
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-gray-50 text-gray-500">Or continue with</span>
-            </div>
-          </motion.div>
-
-          <motion.form 
-            onSubmit={handleLogin} 
-            className="space-y-5"
-            variants={staggerChildren}
-          >
-            <motion.div variants={animations.fadeIn}>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email address
-              </label>
-              <motion.input
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+              <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 required
-                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                placeholder="Enter your email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                whileFocus={{ scale: 1.005, boxShadow: "0 0 0 2px rgba(99, 102, 241, 0.2)" }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                onChange={e => setEmail(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-3 text-base"
               />
-            </motion.div>
-
-            <motion.div variants={animations.fadeIn}>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <motion.input
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
+              <input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 required
-                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                whileFocus={{ scale: 1.005, boxShadow: "0 0 0 2px rgba(99, 102, 241, 0.2)" }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                onChange={e => setPassword(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 px-3 py-3 text-base"
               />
-            </motion.div>
-
-            <motion.div 
-              className="flex items-center justify-between"
-              variants={animations.fadeIn}
-            >
-              <div className="flex items-center">
-                <motion.input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                  Remember me
-                </label>
-              </div>
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Link to="/forgot-password" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                  Forgot password?
-                </Link>
-              </motion.div>
-            </motion.div>
-
-            <motion.button
+            </div>
+            <button
               type="submit"
               disabled={loading}
-              className="w-full h-[50px] flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              variants={animations.fadeIn}
-              whileHover={{ scale: 1.02, boxShadow: "0 4px 12px rgba(79, 70, 229, 0.2)" }}
-              whileTap={{ scale: 0.98 }}
+              className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-md shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-50"
             >
-              {loading ? (
-                <motion.svg 
-                  className="h-5 w-5 text-white" 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  fill="none" 
-                  viewBox="0 0 24 24"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </motion.svg>
-              ) : (
-                'Sign in'
-              )}
-            </motion.button>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
 
-            <motion.div 
-              className="text-center mt-4"
-              variants={animations.fadeIn}
-            >
-              <span className="text-sm text-gray-600">Don't have an account? </span>
-              <motion.span 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-              >
-              <Link to="/signup" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                Sign up
-              </Link>
-              </motion.span>
-            </motion.div>
-          </motion.form>
+          <div className="mt-6 flex flex-col gap-3">
+            <SocialLoginButton provider="google" loading={socialLoading === 'google'} onClick={() => handleSocialLogin('google')} />
+            <SocialLoginButton provider="github" loading={socialLoading === 'github'} onClick={() => handleSocialLogin('github')} />
+            <AppleSignInButton />
+          </div>
+
+          <div className="mt-6 text-center">
+            <Link to="/forgot-password" className="text-blue-600 hover:underline text-sm">Forgot password?</Link>
+          </div>
+          <div className="mt-2 text-center text-sm text-gray-600">
+            Don&apos;t have an account?{' '}
+            <Link to="/signup" className="text-blue-600 hover:underline font-medium">Sign up</Link>
+          </div>
         </motion.div>
       </motion.div>
     </motion.div>

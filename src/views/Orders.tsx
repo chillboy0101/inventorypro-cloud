@@ -29,6 +29,8 @@ import type { Database } from '../types/supabase';
 import type { Order, OrderItem, Product } from '../store/types';
 import { format } from 'date-fns';
 import AddOrderForm from '../components/AddOrderForm';
+import { supabase } from '../lib/supabase';
+import { useLocation } from 'react-router-dom';
 
 type OrderRow = Database['public']['Tables']['orders']['Row'];
 
@@ -51,11 +53,12 @@ function hasItems(order: Order | OrderWithItems): order is OrderWithItems {
 const statusOptions = ['All Status', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 const dateOptions = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'All Time'];
 
-export default function Orders() {
+export default function Orders({ initialOrderId, onClose }: { initialOrderId?: string; onClose?: () => void } = {}) {
   const dispatch = useDispatch<AppDispatch>();
   const ordersState = useSelector((state: RootState) => state.orders);
   const settings = useSelector((state: RootState) => state.settings);
   const { formatPrice } = useAppSettings();
+  const location = useLocation();
   
   const [statusFilter, setStatusFilter] = useState(statusOptions[0]);
   const [dateFilter, setDateFilter] = useState(dateOptions[1]);
@@ -65,6 +68,7 @@ export default function Orders() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewOrderModal, setViewOrderModal] = useState(false);
   const [selectedOrderState, setSelectedOrderState] = useState<OrderWithItems | null>(null);
+  const [serialsByOrderItem, setSerialsByOrderItem] = useState<{ [orderItemId: string]: string[] }>({});
 
   const orders = ordersState.items as OrderWithItems[];
   const ordersLoading = ordersState.loading;
@@ -74,6 +78,40 @@ export default function Orders() {
     console.log('Initial load - fetching orders and products');
     dispatch(fetchOrders());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (viewOrderModal && selectedOrderState) {
+      (async () => {
+        const serialsMap: { [orderItemId: string]: string[] } = {};
+        for (const item of selectedOrderState.items) {
+          // Only fetch for serialized products
+          if (item.product?.is_serialized) {
+            const { data } = await supabase
+              .from('serial_numbers')
+              .select('serial_number')
+              .eq('product_id', item.product_id)
+              .eq('order_id', selectedOrderState.id)
+              .eq('status', 'sold');
+            serialsMap[item.product_id] = (data || []).map(s => s.serial_number);
+          }
+        }
+        setSerialsByOrderItem(serialsMap);
+      })();
+    }
+  }, [viewOrderModal, selectedOrderState]);
+
+  useEffect(() => {
+    // Check for orderId in URL query params
+    const params = new URLSearchParams(location.search);
+    const urlOrderId = params.get('orderId');
+    if (urlOrderId) {
+      const order = orders.find(o => o.id === urlOrderId);
+      if (order) {
+        setSelectedOrderState(order);
+        setViewOrderModal(true);
+      }
+    }
+  }, [location.search, orders]);
 
   // Filter orders based on status, date, and search query
   const filteredOrders = orders.filter(order => {
@@ -677,19 +715,17 @@ export default function Orders() {
   }
 
   return (
-    <div className="p-6">
-      <div className="sm:flex sm:items-center">
+    <div className="p-2 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">Orders</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            A list of all orders including their ID, customer, date, status and total.
-          </p>
+          <p className="mt-2 text-sm text-gray-700">A list of all orders including their ID, customer, date, status and total.</p>
         </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-4">
+        <div className="flex flex-col xs:flex-row flex-wrap gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full xs:w-auto"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
             Add Order
@@ -697,7 +733,7 @@ export default function Orders() {
           <button
             type="button"
             onClick={handleClearAllOrders}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:w-auto"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 w-full xs:w-auto"
           >
             <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
             Clear All
@@ -706,7 +742,7 @@ export default function Orders() {
       </div>
 
       {/* Search and Filter Controls */}
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -761,8 +797,8 @@ export default function Orders() {
       </div>
 
       {/* Table */}
-      <div className="mt-8">
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+      <div className="mt-8 overflow-x-auto">
+        <div className="min-w-[700px] sm:min-w-full overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
           <table className="min-w-full divide-y divide-gray-300">
             <thead className="bg-gray-50">
               <tr>
@@ -901,6 +937,7 @@ export default function Orders() {
                 onClick={() => {
                   setViewOrderModal(false);
                   setSelectedOrderState(null);
+                  if (onClose) onClose();
                 }}
                 className="text-gray-400 hover:text-gray-500"
               >
@@ -961,6 +998,11 @@ export default function Orders() {
                                 ({productSku})
                                 {isProductDeleted && ' - Product deleted from inventory'}
                               </span>
+                              {item.product?.is_serialized && serialsByOrderItem[item.product_id]?.length > 0 && (
+                                <div className="text-xs text-blue-700 mt-1">
+                                  Serials: {serialsByOrderItem[item.product_id].join(', ')}
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {item.quantity}

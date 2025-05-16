@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
-import { fetchProducts, deleteProduct, fetchCategories, fetchLocations, clearAllInventory } from '../store/slices/inventorySlice';
+import { fetchProducts, deleteProduct, fetchCategories, fetchLocations, clearAllInventory, updateProduct } from '../store/slices/inventorySlice';
 import { setItemsPerPage } from '../store/slices/settingsSlice';
 import { useAppSettings } from '../hooks/useAppSettings';
 import {
@@ -13,17 +13,24 @@ import {
   ChevronRightIcon,
   ExclamationTriangleIcon,
   ShoppingBagIcon,
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import AddProductForm from '../components/AddProductForm';
 import EditProductForm from '../components/EditProductForm';
 import UnifiedBarcodeScanner from '../components/UnifiedBarcodeScanner';
 import type { Product } from '../store/types';
+import SerialNumberManager from '../components/SerialNumberManager';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { getStockStatus } from '../utils/stockStatus';
 
 const Products: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { items: products, loading, categories, locations, error } = useSelector((state: RootState) => state.inventory);
   const settings = useSelector((state: RootState) => state.settings);
   const { formatPrice, isLowStock, companyName } = useAppSettings();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -35,6 +42,8 @@ const Products: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [initialSku, setInitialSku] = useState<string>('');
   const [initialProductData, setInitialProductData] = useState<any>({});
+  const [selectedProductForSerial, setSelectedProductForSerial] = useState<Product | null>(null);
+  const [pendingSerialProduct, setPendingSerialProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     dispatch(fetchProducts());
@@ -165,6 +174,63 @@ const Products: React.FC = () => {
     setCurrentPage(1); // Reset to first page when changing items per page
   };
 
+  // Custom handler for product creation
+  const handleProductCreated = (product: Product) => {
+    setShowAddForm(false);
+    if (product.is_serialized && product.stock > 0) {
+      setPendingSerialProduct(product);
+    }
+  };
+
+  // Handler to open order page from SerialNumberManager and close serial modal
+  const handleOrderLinkFromSerials = (orderId: string) => {
+    setSelectedProductForSerial(null); // Close SerialNumberManager
+    setTimeout(() => {
+      navigate(`/orders?orderId=${orderId}`);
+    }, 200);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const manageSerialsFor = params.get('manageSerialsFor');
+    if (manageSerialsFor && products.length > 0) {
+      const product = products.find(p => p.id === manageSerialsFor);
+      if (product) setSelectedProductForSerial(product);
+    }
+  }, [location.search, products]);
+
+  // Handler after serials are added: update stock to match serial count if needed
+  const handleSerialsDone = async () => {
+    if (selectedProductForSerial) {
+      try {
+        // Fetch serials for this product
+        const { data: serials, error: serialsError } = await supabase
+          .from('serial_numbers')
+          .select('*')
+          .eq('product_id', selectedProductForSerial.id)
+          .eq('status', 'available');
+        if (serialsError) throw serialsError;
+        if (serials) {
+          const serialCount = serials.length;
+          if (serialCount !== selectedProductForSerial.stock) {
+            await dispatch(updateProduct({
+              id: selectedProductForSerial.id,
+              stock: serialCount,
+              adjustment_reason: `Stock synced to serials (${serialCount})`
+            })).unwrap();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update stock after adding serials:', error);
+      }
+    }
+    setSelectedProductForSerial(null);
+    // Remove the query param from the URL
+    const params = new URLSearchParams(location.search);
+    params.delete('manageSerialsFor');
+    navigate({ search: params.toString() }, { replace: true });
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -175,30 +241,27 @@ const Products: React.FC = () => {
 
   return (
     <div className={`${settings.darkMode ? 'bg-[#121212] text-white' : 'bg-white'}`}>
-      <div className={`px-4 sm:px-6 lg:px-8 py-6 ${settings.darkMode ? 'text-white' : 'text-gray-900'}`}>
-        <div className="sm:flex sm:items-center justify-between">
+      <div className={`px-2 sm:px-6 lg:px-8 py-6 ${settings.darkMode ? 'text-white' : 'text-gray-900'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className={`text-2xl font-bold tracking-tight ${settings.darkMode ? 'text-white' : 'text-gray-900'} mb-1`}>{companyName} Products</h1>
-            <p className={`text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              A list of all products in your inventory
-            </p>
+            <p className={`text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-700'}`}>A list of all products in your inventory</p>
           </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none flex flex-wrap gap-2">
+          <div className="flex flex-col xs:flex-row flex-wrap gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto transition-colors"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full xs:w-auto transition-colors"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Product
             </button>
             <UnifiedBarcodeScanner 
               buttonText="Scan Barcode" 
-              onProductFound={(product) => setEditingProduct(product)}
               onComplete={() => dispatch(fetchProducts())}
             />
             <button
               onClick={handleClearAllProducts}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:w-auto transition-colors"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 w-full xs:w-auto transition-colors"
             >
               <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
               Clear All
@@ -277,116 +340,125 @@ const Products: React.FC = () => {
           </div>
         )}
 
-        {/* Products Table */}
-        <div className={`mt-8 flex flex-col ${settings.darkMode ? 'bg-[#1e1e1e]' : 'bg-white'} shadow-xl overflow-hidden sm:rounded-lg border ${settings.darkMode ? 'border-[#3d3d3d]' : 'border-gray-200'}`}>
-          <div className="overflow-x-auto">
-            <div className="inline-block min-w-full align-middle">
-              <table className={`min-w-full divide-y ${settings.darkMode ? 'divide-[#3d3d3d]' : 'divide-gray-200'}`}>
-                <thead className={`${settings.darkMode ? 'bg-[#272727]' : 'bg-gray-50'}`}>
-                  <tr>
-                    <th scope="col" className={`py-3.5 pl-4 pr-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Product
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      SKU
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Category
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Location
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Stock
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Price
-                    </th>
-                    <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
-                      Value
-                    </th>
-                    <th scope="col" className={`relative py-3.5 pl-3 pr-4 ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
-                      <span className="sr-only">Actions</span>
-                    </th>
+        {/* Products Table - mobile: horizontal scroll, touch-friendly */}
+        <div className={`mt-8 flex flex-col ${settings.darkMode ? 'bg-[#1e1e1e]' : 'bg-white'} shadow-xl overflow-x-auto sm:overflow-hidden sm:rounded-lg border ${settings.darkMode ? 'border-[#3d3d3d]' : 'border-gray-200'}`}> 
+          <div className="min-w-[700px] sm:min-w-full inline-block align-middle">
+            <table className={`min-w-full divide-y ${settings.darkMode ? 'divide-[#3d3d3d]' : 'divide-gray-200'}`}>
+              <thead className={`${settings.darkMode ? 'bg-[#272727]' : 'bg-gray-50'}`}>
+                <tr>
+                  <th scope="col" className={`py-3.5 pl-4 pr-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Product
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    SKU
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Category
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Location
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Stock
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Price
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>
+                    Value
+                  </th>
+                  <th scope="col" className={`py-3.5 px-3 text-left text-sm font-semibold ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'} uppercase tracking-wider`}>Serialized?</th>
+                  <th scope="col" className={`relative py-3.5 pl-3 pr-4 ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${settings.darkMode ? 'divide-[#3d3d3d]' : 'divide-gray-200'}`}>
+                {paginatedProducts.map((product) => (
+                  <tr 
+                    key={product.id} 
+                    className={`${settings.darkMode ? 'hover:bg-[#2a2a2a] transition-colors' : 'hover:bg-gray-50'}`}
+                  >
+                    <td className={`whitespace-nowrap py-4 pl-4 pr-3 text-sm ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
+                      <div className="flex items-center">
+                        <div className={`h-10 w-10 flex-shrink-0 rounded-md ${settings.darkMode ? 'bg-blue-900/20' : 'bg-blue-100'} flex items-center justify-center`}>
+                          <ShoppingBagIcon className={`h-6 w-6 ${settings.darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                        </div>
+                        <div className="ml-4">
+                          <div className={`font-medium ${settings.darkMode ? 'text-white' : 'text-gray-900'}`}>{product.name}</div>
+                          <div className={`text-xs ${settings.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{product.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.sku}</td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.category}</td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.location}</td>
+                    <td className="whitespace-nowrap py-4 px-3 text-sm">
+                      <div className="flex items-center">
+                        <span 
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium leading-5 ${
+                            getStockStatus(product.stock, product.reorder_level || 0, settings.lowStockThreshold || 5) === 'Out of Stock'
+                              ? settings.darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'
+                              : getStockStatus(product.stock, product.reorder_level || 0, settings.lowStockThreshold || 5) === 'Low Stock'
+                                ? settings.darkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-800'
+                                : settings.darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'
+                          } mr-2`}
+                        >
+                          {getStockStatus(product.stock, product.reorder_level || 0, settings.lowStockThreshold || 5)}
+                        </span>
+                        <span className={`${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.stock}</span>
+                      </div>
+                    </td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{formatPrice(product.selling_price ?? 0)}</td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{formatPrice(product.stock * (product.selling_price ?? 0))}</td>
+                    <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{String(product.is_serialized)}</td>
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => setEditingProduct(product)}
+                          className={`inline-flex items-center p-1.5 rounded-md transition-colors ${
+                            settings.darkMode
+                              ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/30'
+                              : 'text-blue-600 hover:text-blue-900 hover:bg-blue-50'
+                          }`}
+                          disabled={deletingProductId === product.id}
+                          title="Edit product"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                          <span className="sr-only">Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className={`inline-flex items-center p-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            settings.darkMode
+                              ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30'
+                              : 'text-red-600 hover:text-red-900 hover:bg-red-50'
+                          }`}
+                          disabled={deletingProductId === product.id}
+                          title="Delete product"
+                        >
+                          {deletingProductId === product.id ? (
+                            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-red-600" />
+                          ) : (
+                            <TrashIcon className="h-5 w-5" />
+                          )}
+                          <span className="sr-only">Delete</span>
+                        </button>
+                        {product.is_serialized && (
+                          <button
+                            onClick={() => setSelectedProductForSerial(product)}
+                            className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-md p-2 transition-colors"
+                            title="View Serials"
+                          >
+                            <QrCodeIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className={`divide-y ${settings.darkMode ? 'divide-[#3d3d3d]' : 'divide-gray-200'}`}>
-                  {paginatedProducts.map((product) => (
-                    <tr 
-                      key={product.id} 
-                      className={`${settings.darkMode ? 'hover:bg-[#2a2a2a] transition-colors' : 'hover:bg-gray-50'}`}
-                    >
-                      <td className={`whitespace-nowrap py-4 pl-4 pr-3 text-sm ${settings.darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
-                        <div className="flex items-center">
-                          <div className={`h-10 w-10 flex-shrink-0 rounded-md ${settings.darkMode ? 'bg-blue-900/20' : 'bg-blue-100'} flex items-center justify-center`}>
-                            <ShoppingBagIcon className={`h-6 w-6 ${settings.darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                          </div>
-                          <div className="ml-4">
-                            <div className={`font-medium ${settings.darkMode ? 'text-white' : 'text-gray-900'}`}>{product.name}</div>
-                            <div className={`text-xs ${settings.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{product.description}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.sku}</td>
-                      <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.category}</td>
-                      <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.location}</td>
-                      <td className="whitespace-nowrap py-4 px-3 text-sm">
-                        <div className="flex items-center">
-                          <span 
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium leading-5 ${
-                              product.stock <= 0
-                                ? settings.darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'
-                                : isLowStock(product.stock)
-                                  ? settings.darkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-800'
-                                  : settings.darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'
-                            } mr-2`}
-                          >
-                            {product.stock <= 0 ? 'Out of Stock' : isLowStock(product.stock) ? 'Low Stock' : 'In Stock'}
-                          </span>
-                          <span className={`${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{product.stock}</span>
-                        </div>
-                      </td>
-                      <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{formatPrice(product.selling_price ?? 0)}</td>
-                      <td className={`whitespace-nowrap py-4 px-3 text-sm ${settings.darkMode ? 'text-gray-300' : 'text-gray-500'}`}>{formatPrice(product.stock * (product.selling_price ?? 0))}</td>
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => setEditingProduct(product)}
-                            className={`inline-flex items-center p-1.5 rounded-md transition-colors ${
-                              settings.darkMode
-                                ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/30'
-                                : 'text-blue-600 hover:text-blue-900 hover:bg-blue-50'
-                            }`}
-                            disabled={deletingProductId === product.id}
-                            title="Edit product"
-                          >
-                            <PencilIcon className="h-5 w-5" />
-                            <span className="sr-only">Edit</span>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className={`inline-flex items-center p-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                              settings.darkMode
-                                ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30'
-                                : 'text-red-600 hover:text-red-900 hover:bg-red-50'
-                            }`}
-                            disabled={deletingProductId === product.id}
-                            title="Delete product"
-                          >
-                            {deletingProductId === product.id ? (
-                              <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-red-600" />
-                            ) : (
-                              <TrashIcon className="h-5 w-5" />
-                            )}
-                            <span className="sr-only">Delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -480,6 +552,7 @@ const Products: React.FC = () => {
                 onClose={() => setShowAddForm(false)}
                 initialSku={initialSku}
                 initialProductData={initialProductData}
+                onProductCreated={handleProductCreated}
               />
             </div>
           </div>
@@ -490,7 +563,29 @@ const Products: React.FC = () => {
           <EditProductForm 
             product={editingProduct} 
             onClose={() => setEditingProduct(null)} 
+            onSuccess={() => {}}
           />
+        )}
+
+        {selectedProductForSerial && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <SerialNumberManager
+              productId={selectedProductForSerial.id}
+              onClose={handleSerialsDone}
+              onOrderLinkClick={handleOrderLinkFromSerials}
+            />
+          </div>
+        )}
+
+        {/* Serial Number Modal */}
+        {pendingSerialProduct && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <SerialNumberManager
+              productId={pendingSerialProduct.id}
+              initialCount={pendingSerialProduct.stock}
+              onClose={() => setPendingSerialProduct(null)}
+            />
+          </div>
         )}
       </div>
     </div>

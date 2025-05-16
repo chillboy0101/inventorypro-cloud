@@ -13,8 +13,10 @@ export interface Product {
   selling_price?: number;
   custom_icon?: string | null; // URL for custom uploaded image
   custom_icon_type?: 'default' | 'custom' | null; // Whether to use default category icon or custom image
+  is_serialized: boolean;
   created_at: string;
   updated_at: string;
+  adjustment_reason?: string; // Reason for the last stock adjustment
   last_adjustment?: {
     quantity: number;
     type: 'add' | 'subtract';

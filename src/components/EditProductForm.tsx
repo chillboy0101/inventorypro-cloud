@@ -1,110 +1,175 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
-import { updateProduct, fetchCategories, fetchLocations } from '../store/slices/inventorySlice';
+import { fetchCategories, fetchLocations } from '../store/slices/inventorySlice';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { Product } from '../store/types';
+import SerialNumberManager from './SerialNumberManager';
+import RemoveSerialsModal from './RemoveSerialsModal';
+import { supabase } from '../lib/supabase';
 
 interface EditProductFormProps {
   product: Product;
   onClose: () => void;
+  onSuccess: () => void;
 }
 
-export default function EditProductForm({ product, onClose }: EditProductFormProps) {
+export default function EditProductForm({ product, onClose, onSuccess }: EditProductFormProps) {
   const dispatch = useDispatch<AppDispatch>();
   const categories = useSelector((state: RootState) => state.inventory.categories);
   const locations = useSelector((state: RootState) => state.inventory.locations);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [showSerialManager, setShowSerialManager] = useState(false);
+  const [showRemoveSerials, setShowRemoveSerials] = useState(false);
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    sku: string;
+    category: string;
+    stock: number;
+    cost_price: string;
+    selling_price: string;
+    location: string;
+    reorder_level: number;
+    is_serialized: boolean;
+  }>({
+    name: product.name,
+    description: product.description || '',
+    sku: product.sku,
+    category: product.category,
+    stock: product.stock,
+    cost_price: product.cost_price !== undefined && product.cost_price !== null ? String(product.cost_price) : '',
+    selling_price: product.selling_price !== undefined && product.selling_price !== null ? String(product.selling_price) : '',
+    location: product.location,
+    reorder_level: product.reorder_level,
+    is_serialized: product.is_serialized
+  });
 
   useEffect(() => {
     dispatch(fetchCategories());
     dispatch(fetchLocations());
   }, [dispatch]);
 
-  const [formData, setFormData] = useState({
-    name: product.name,
-    description: product.description || '',
-    sku: product.sku,
-    category: product.category,
-    stock: product.stock,
-    cost_price: product.cost_price,
-    selling_price: product.selling_price,
-    location: product.location,
-    reorder_level: product.reorder_level
-  });
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const newData = {
         ...prev,
-        [name]: name === 'stock' || name === 'cost_price' || name === 'selling_price' || name === 'reorder_level'
-          ? parseFloat(value) || 0
-          : value
+        [name]: name === 'stock' || name === 'reorder_level'
+          ? Number(value) || 0
+          : name === 'cost_price' || name === 'selling_price'
+            ? value
+            : value
       };
       return newData;
     });
     setError(null);
   };
 
-  const validateForm = () => {
-    if (!formData.name.trim()) return 'Product name is required';
-    if (!formData.sku.trim()) return 'SKU is required';
-    if (!formData.category.trim()) return 'Category is required';
-    if (!formData.location.trim()) return 'Location is required';
-    if (formData.cost_price <= 0) return 'Cost price must be greater than 0';
-    if (formData.selling_price <= 0) return 'Selling price must be greater than 0';
-    if (formData.selling_price <= formData.cost_price) return 'Selling price must be greater than cost price';
-    if (formData.stock < 0) return 'Stock cannot be negative';
-    if (formData.reorder_level < 0) return 'Reorder level cannot be negative';
-    return null;
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let cleaned = value.replace(/^0+(?!\.)/, '');
+    cleaned = cleaned.replace(/[^\d.]/g, '');
+    setFormData(prev => ({
+      ...prev,
+      [name]: cleaned
+    }));
+  };
+
+  const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let num = parseFloat(value);
+    if (isNaN(num)) num = 0;
+    let formatted = num < 1 && num > 0 ? num.toFixed(2) : String(num);
+    if (!formatted.includes('.')) formatted += '.00';
+    else if (/\.\d$/.test(formatted)) formatted += '0';
+    setFormData(prev => ({ ...prev, [name]: formatted }));
+  };
+
+  const handlePriceFocus = () => {
+    // No need to update priceFocus as it's not used
+  };
+
+  const handleReorderLevelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      reorder_level: Number(value)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const updates = {
-        id: product.id,
-        ...formData,
-        // Ensure numeric fields are numbers
-        stock: Number(formData.stock),
-        cost_price: Number(formData.cost_price),
-        selling_price: Number(formData.selling_price),
-        reorder_level: Number(formData.reorder_level)
-      };
-
-      const result = await dispatch(updateProduct(updates)).unwrap();
-      if (result) {
-        onClose();
+      // For serialized products, stock is managed through serial numbers
+      if (formData.is_serialized) {
+        const currentStock = Number(product.stock);
+        const newStock = Number(formData.stock);
+        
+        if (newStock > currentStock) {
+          // Need to add serials
+          setShowSerialManager(true);
+          return;
+        } else if (newStock < currentStock) {
+          // Need to remove serials
+          setShowRemoveSerials(true);
+          return;
+        }
       }
-    } catch (error) {
-      console.error('Failed to update product:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update product. Please try again.');
+
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          name: formData.name,
+          description: formData.description,
+          category: formData.category,
+          cost_price: formData.cost_price === '' ? null : Number(formData.cost_price),
+          selling_price: formData.selling_price === '' ? null : Number(formData.selling_price),
+          stock: formData.is_serialized ? Number(product.stock) : Number(formData.stock),
+          reorder_level: formData.reorder_level,
+          is_serialized: formData.is_serialized,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', product.id);
+
+      if (updateError) throw updateError;
+
+      setSuccess('Product updated successfully');
+      onSuccess();
+    } catch (err) {
+      console.error('Error updating product:', err);
+      setError('Failed to update product');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleSerialsAdded = async () => {
+    setShowSerialManager(false);
+    const formEvent = new Event('submit') as unknown as React.FormEvent;
+    await handleSubmit(formEvent);
+  };
+
+  const handleSerialsRemoved = async () => {
+    setShowRemoveSerials(false);
+    const formEvent = new Event('submit') as unknown as React.FormEvent;
+    await handleSubmit(formEvent);
+  };
+
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Edit Product</h2>
+          <h2 className="text-xl font-semibold">Edit Product</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-            disabled={isSubmitting}
+            className="text-gray-500 hover:text-gray-700"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -113,6 +178,12 @@ export default function EditProductForm({ product, onClose }: EditProductFormPro
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">
+            {success}
           </div>
         )}
 
@@ -204,56 +275,69 @@ export default function EditProductForm({ product, onClose }: EditProductFormPro
                 value={formData.stock}
                 onChange={handleChange}
                 min="0"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                step="1"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 required
-                disabled={isSubmitting}
+                disabled={formData.is_serialized}
               />
+              {formData.is_serialized && (
+                <div className="text-xs text-blue-600 mt-1">
+                  Stock is managed automatically based on serial numbers. To change stock, add or remove serial numbers.
+                </div>
+              )}
             </div>
 
             <div>
               <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700">
                 Cost Price
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                 <input
-                  type="number"
+                  type="text"
                   id="cost_price"
                   name="cost_price"
                   min="0"
                   step="0.01"
-                  value={formData.cost_price}
-                  onChange={handleChange}
-                  className="mt-1 block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="0.00"
+                  value={formData.cost_price === '' ? '' : String(formData.cost_price)}
+                  onChange={handlePriceChange}
+                  onBlur={handlePriceBlur}
+                  onFocus={handlePriceFocus}
+                  className="mt-1 block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
-                  disabled={isSubmitting}
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">The price you pay to acquire the product</p>
             </div>
 
             <div>
               <label htmlFor="selling_price" className="block text-sm font-medium text-gray-700">
                 Selling Price
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                 <input
-                  type="number"
+                  type="text"
                   id="selling_price"
                   name="selling_price"
                   min="0"
                   step="0.01"
-                  value={formData.selling_price}
-                  onChange={handleChange}
-                  className="mt-1 block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="0.00"
+                  value={formData.selling_price === '' ? '' : String(formData.selling_price)}
+                  onChange={handlePriceChange}
+                  onBlur={handlePriceBlur}
+                  onFocus={handlePriceFocus}
+                  className={`mt-1 block w-full pl-7 border rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${Number(formData.selling_price) <= Number(formData.cost_price) ? 'border-red-300' : 'border-gray-300'}`}
                   required
-                  disabled={isSubmitting}
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">The price customers will pay for the product</p>
+              {Number(formData.selling_price) <= Number(formData.cost_price) && (
+                <p className="mt-1 text-xs text-red-500">
+                  Selling price should be higher than cost price for profit
+                </p>
+              )}
             </div>
 
             <div>
@@ -261,15 +345,14 @@ export default function EditProductForm({ product, onClose }: EditProductFormPro
                 Reorder Level
               </label>
               <input
-                type="number"
+                type="text"
                 id="reorder_level"
                 name="reorder_level"
-                value={formData.reorder_level}
-                onChange={handleChange}
+                value={Number(formData.reorder_level) === 0 ? '' : String(formData.reorder_level ?? '')}
+                onChange={handleReorderLevelChange}
                 min="0"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-right focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 required
-                disabled={isSubmitting}
               />
             </div>
 
@@ -314,6 +397,26 @@ export default function EditProductForm({ product, onClose }: EditProductFormPro
             </button>
           </div>
         </form>
+
+        {showSerialManager && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <SerialNumberManager
+              productId={product.id}
+              initialCount={Number(formData.stock)}
+              onClose={handleSerialsAdded}
+            />
+          </div>
+        )}
+
+        {showRemoveSerials && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+            <RemoveSerialsModal
+              productId={product.id}
+              onDone={handleSerialsRemoved}
+              onClose={() => setShowRemoveSerials(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

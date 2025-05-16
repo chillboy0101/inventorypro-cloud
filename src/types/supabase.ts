@@ -17,12 +17,13 @@ export interface Database {
           sku: string;
           category: string;
           stock: number;
-          cost_price?: number;
-          selling_price?: number;
+          cost_price: number;
+          selling_price: number;
           location: string;
           reorder_level: number;
           custom_icon?: string;
           custom_icon_type?: 'default' | 'custom';
+          is_serialized: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -33,12 +34,13 @@ export interface Database {
           sku: string;
           category: string;
           stock?: number;
-          cost_price?: number;
-          selling_price?: number;
+          cost_price: number;
+          selling_price: number;
           location: string;
           reorder_level?: number;
           custom_icon?: string;
           custom_icon_type?: 'default' | 'custom';
+          is_serialized?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -55,6 +57,39 @@ export interface Database {
           reorder_level?: number;
           custom_icon?: string;
           custom_icon_type?: 'default' | 'custom';
+          is_serialized?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      serial_numbers: {
+        Row: {
+          id: string;
+          product_id: string;
+          serial_number: string;
+          status: 'available' | 'allocated' | 'sold' | 'returned' | 'damaged';
+          order_id: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          serial_number: string;
+          status?: 'available' | 'allocated' | 'sold' | 'returned' | 'damaged';
+          order_id?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          serial_number?: string;
+          status?: 'available' | 'allocated' | 'sold' | 'returned' | 'damaged';
+          order_id?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -12,22 +12,39 @@ import LoadingScreen from '../components/LoadingScreen';
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       
-      // Check if this is likely an email verification URL (not a social login)
+      // Check if this is a password reset flow
+      const isPasswordReset = url.pathname.includes('reset-password') || 
+                              url.searchParams.has('type') && url.searchParams.get('type') === 'recovery';
+      
+      // Skip verification detection for password reset flows
+      if (isPasswordReset) {
+        console.log('[Auth] Password reset flow detected, skipping verification check');
+        return;
+      }
+      
+      // IMPROVED CHECK: More clearly separate OAuth from email verification
+      // Check if this is a social login
+      const isSocialLogin = sessionStorage.getItem('authProvider') || 
+                          sessionStorage.getItem('isSocialLogin') === 'true' ||
+                          url.searchParams.has('provider') ||
+                          url.hash.includes('provider=');
+      
+      // Skip the verification detection completely for social logins
+      if (isSocialLogin) {
+        console.log('[Auth] Social login detected, skipping verification check');
+        return;
+      }
+      
+      // Now check if it's an email verification (only if NOT a social login or password reset)
       const hasCode = url.searchParams.has('code');
       const hasType = url.searchParams.has('type') && url.searchParams.get('type') === 'signup';
       const hasEmailConfirm = url.searchParams.has('email_confirm') || url.hash.includes('email_confirm');
       
-      // Social login is different - it won't have these specific parameters
-      const isSocialLogin = sessionStorage.getItem('authProvider') || 
-                            url.searchParams.has('provider') ||
-                            url.hash.includes('provider=');
-      
-      const isVerification = (hasCode || hasType || hasEmailConfirm || url.hash.includes('type=signup')) && 
-                             !isSocialLogin;
+      const isVerification = (hasCode || hasType || hasEmailConfirm || url.hash.includes('type=signup'));
       
       // If this looks like verification and we don't have local override flag
       if (isVerification) {
-        console.log('[Auth] Early verification detection, setting storage flag');
+        console.log('[Auth] Email verification detection, setting storage flag');
         // Set a flag to show success page
         sessionStorage.setItem('showing_verification_success', 'true');
         
@@ -47,7 +64,7 @@ import LoadingScreen from '../components/LoadingScreen';
 })();
 
 const AuthCallback: React.FC = () => {
-  const { user, setUser } = useAuth();
+  const { setUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
@@ -68,13 +85,54 @@ const AuthCallback: React.FC = () => {
         
         if (email) {
           setVerifiedEmail(email);
-          localStorage.setItem('verification_email', email);
+          // Only store the email if not a social login
+          if (!sessionStorage.getItem('isSocialLogin')) {
+            localStorage.setItem('verification_email', email);
+          }
         }
         
-        // SIMPLE CHECK: If code parameter exists AND NOT social login, assume it's verification
-        if ((searchParams.has('code') || hashParams.has('code')) && 
-            !sessionStorage.getItem('isSocialLogin')) {
-          console.log('[AuthCallback] Code parameter detected, treating as verification');
+        // IMPROVED: Clear handling distinction between social login and verification
+        // Check if this is a social login first - this takes priority
+        if (sessionStorage.getItem('isSocialLogin') === 'true') {
+          console.log('[AuthCallback] Processing social login flow');
+          
+          // For social login, we don't want to show verification screens
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            // Set user and redirect to dashboard immediately
+            console.log('[AuthCallback] Social login session found, redirecting to dashboard');
+            setUser(session.user);
+            sessionStorage.removeItem('isSocialLogin');
+            sessionStorage.removeItem('authProvider');
+            navigate('/', { replace: true });
+            return;
+          } else if (searchParams.has('code') || hashParams.has('code')) {
+            // Exchange code for session
+            const code = searchParams.get('code') || hashParams.get('code');
+            
+            console.log('[AuthCallback] Exchanging code for session in social login flow');
+            await supabase.auth.exchangeCodeForSession(code || '');
+            
+            const { data: { session: newSession } } = await supabase.auth.getSession();
+            
+            if (newSession) {
+              console.log('[AuthCallback] Session established via code exchange, redirecting');
+              setUser(newSession.user);
+              sessionStorage.removeItem('isSocialLogin');
+              sessionStorage.removeItem('authProvider');
+              navigate('/', { replace: true });
+              return;
+            } else {
+              throw new Error('Failed to establish session');
+            }
+          } else {
+            throw new Error('No code found for social login');
+          }
+        }
+        // Handle email verification flow (NOT social login)
+        else if (searchParams.has('code') || hashParams.has('code')) {
+          console.log('[AuthCallback] Code parameter detected in non-social login flow, treating as verification');
           
           // Sign out any existing session to prevent redirects
           await supabase.auth.signOut();
@@ -82,38 +140,9 @@ const AuthCallback: React.FC = () => {
           // Done loading
           setLoading(false);
           return;
-        }
-        
-        // For social login, proceed with normal flow
-        if (sessionStorage.getItem('isSocialLogin') === 'true') {
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session) {
-            // Set user and redirect to dashboard
-            setUser(session.user);
-            sessionStorage.removeItem('isSocialLogin');
-            sessionStorage.removeItem('authProvider');
-            navigate('/', { replace: true });
-          } else if (searchParams.has('code') || hashParams.has('code')) {
-            // Exchange code for session
-            const code = searchParams.get('code') || hashParams.get('code');
-            await supabase.auth.exchangeCodeForSession(code || '');
-            
-            const { data: { session: newSession } } = await supabase.auth.getSession();
-            
-            if (newSession) {
-              setUser(newSession.user);
-              sessionStorage.removeItem('isSocialLogin');
-              sessionStorage.removeItem('authProvider');
-              navigate('/', { replace: true });
-            } else {
-              throw new Error('Failed to establish session');
-            }
-          } else {
-            throw new Error('No code found for social login');
-          }
         } else {
           // Not a social login or verification flow with code
+          console.log('[AuthCallback] No recognizable flow detected, returning to login');
           navigate('/login', { replace: true });
         }
       } catch (err) {

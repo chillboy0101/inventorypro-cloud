@@ -4,7 +4,6 @@ import type { Database } from '../../types/supabase';
 
 type Product = Database['public']['Tables']['products']['Row'];
 type ProductInsert = Database['public']['Tables']['products']['Insert'];
-type ProductUpdate = Database['public']['Tables']['products']['Update'];
 
 export class ProductsApi extends BaseApi<'products'> {
   constructor() {
@@ -39,8 +38,8 @@ export class ProductsApi extends BaseApi<'products'> {
     const { data, error } = await supabase
       .from(this.table)
       .select('*')
-      .lte('quantity', 'minimum_quantity')
-      .order('quantity', { ascending: true });
+      .lte('stock', 'reorder_level')
+      .order('stock', { ascending: true });
 
     if (error) throw error;
     return data;
@@ -50,7 +49,7 @@ export class ProductsApi extends BaseApi<'products'> {
     const { data, error } = await supabase
       .from(this.table)
       .select('*')
-      .eq('quantity', 0);
+      .eq('stock', 0);
 
     if (error) throw error;
     return data;
@@ -67,15 +66,15 @@ export class ProductsApi extends BaseApi<'products'> {
     return data;
   }
 
-  async updateStock(id: string, quantity: number, type: 'in' | 'out', reason: string) {
+  async updateStock(id: string, amount: number, type: 'in' | 'out', reason: string) {
     const { data: product } = await this.getById(id);
     if (!product) throw new Error('Product not found');
 
-    const newQuantity = type === 'in' 
-      ? product.quantity + quantity
-      : product.quantity - quantity;
+    const newStock = type === 'in' 
+      ? product.stock + amount
+      : product.stock - amount;
 
-    if (newQuantity < 0) {
+    if (newStock < 0) {
       throw new Error('Insufficient stock');
     }
 
@@ -83,14 +82,14 @@ export class ProductsApi extends BaseApi<'products'> {
       .from('stock_adjustments')
       .insert({
         product_id: id,
-        quantity,
+        quantity: amount,
         type,
         reason
       });
 
     if (adjustmentError) throw adjustmentError;
 
-    return this.update(id, { quantity: newQuantity });
+    return this.update(id, { stock: newStock });
   }
 
   async getBySku(sku: string): Promise<Product | null> {

@@ -3,7 +3,6 @@ import type { Database } from '../../types/supabase';
 
 type OrderRow = Database['public']['Tables']['orders']['Row'];
 type OrderInsert = Database['public']['Tables']['orders']['Insert'];
-type OrderItemRow = Database['public']['Tables']['order_items']['Row'];
 type OrderItemInsert = Database['public']['Tables']['order_items']['Insert'];
 
 export class OrdersApi extends BaseApi<'orders'> {

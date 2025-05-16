@@ -13,6 +13,8 @@ const AddProduct: React.FC = () => {
     price: '',
     quantity: '',
     minimum_quantity: '',
+    category: 'Uncategorized',
+    location: 'Default',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -29,11 +31,19 @@ const AddProduct: React.FC = () => {
     setError(null);
 
     try {
+      // Destructure to avoid spreading invalid properties
+      const { name, sku, description } = formData;
+      
       await productsApi.create({
-        ...formData,
-        price: parseFloat(formData.price),
-        quantity: parseInt(formData.quantity),
-        minimum_quantity: parseInt(formData.minimum_quantity),
+        name,
+        sku,
+        description,
+        cost_price: parseFloat(formData.price || '0'),
+        selling_price: parseFloat(formData.price || '0'),
+        stock: parseInt(formData.quantity || '0'),
+        reorder_level: parseInt(formData.minimum_quantity || '0'),
+        category: formData.category || 'Uncategorized',
+        location: formData.location || 'Default',
       });
       navigate('/products');
     } catch (err) {

@@ -1,6 +1,28 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase';
-import type { Product, ProductsState } from '../types';
+import type { Database } from '../../types/supabase';
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string | null;
+  sku: string;
+  category: string;
+  stock?: number;
+  cost_price: number;
+  selling_price: number;
+  location: string;
+  minimum_quantity: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ProductsState {
+  items: Product[];
+  loading: boolean;
+  error: string | null;
+  selectedProduct: Product | null;
+}
 
 const initialState: ProductsState = {
   items: [],

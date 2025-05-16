@@ -5,32 +5,48 @@ import { AppDispatch } from '../store';
 import { createProduct } from '../store/slices/inventorySlice';
 import type { Database } from '../types/supabase';
 
-type ProductInsert = Database['public']['Tables']['products']['Insert'];
+interface Product {
+  id?: string;
+  name: string;
+  description?: string;
+  sku: string;
+  category: string;
+  stock?: number;
+  cost_price: number;
+  selling_price: number;
+  location: string;
+  minimum_quantity: number;
+  updated_at?: string;
+}
 
 const AddProduct: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<ProductInsert>({
+  const [product, setProduct] = useState<Product>({
     name: '',
     sku: '',
-    price: 0,
-    quantity: 0,
-    minimum_quantity: 0
+    cost_price: 0,
+    selling_price: 0,
+    location: '',
+    minimum_quantity: 0,
+    category: ''
   });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setProduct(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      await dispatch(createProduct({
-        name: formData.name,
-        sku: formData.sku,
-        price: formData.price,
-        quantity: formData.quantity,
-        minimum_quantity: formData.minimum_quantity
-      })).unwrap();
+      await dispatch(createProduct(product)).unwrap();
 
       navigate('/products');
     } catch (error) {
@@ -59,8 +75,9 @@ const AddProduct: React.FC = () => {
           <input
             type="text"
             id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            name="name"
+            value={product.name}
+            onChange={handleInputChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
@@ -73,39 +90,56 @@ const AddProduct: React.FC = () => {
           <input
             type="text"
             id="sku"
-            value={formData.sku}
-            onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+            name="sku"
+            value={product.sku}
+            onChange={handleInputChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-            Price
+          <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700">
+            Cost Price
           </label>
           <input
             type="number"
-            id="price"
-            min="0"
             step="0.01"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+            id="cost_price"
+            name="cost_price"
+            value={product.cost_price}
+            onChange={handleInputChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-            Initial Quantity
+          <label htmlFor="selling_price" className="block text-sm font-medium text-gray-700">
+            Selling Price
           </label>
           <input
             type="number"
-            id="quantity"
-            min="0"
-            value={formData.quantity}
-            onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+            step="0.01"
+            id="selling_price"
+            name="selling_price"
+            value={product.selling_price}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+            Location
+          </label>
+          <input
+            type="text"
+            id="location"
+            name="location"
+            value={product.location}
+            onChange={handleInputChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
           />
@@ -118,11 +152,39 @@ const AddProduct: React.FC = () => {
           <input
             type="number"
             id="minimum_quantity"
-            min="0"
-            value={formData.minimum_quantity}
-            onChange={(e) => setFormData({ ...formData, minimum_quantity: parseInt(e.target.value) })}
+            name="minimum_quantity"
+            value={product.minimum_quantity}
+            onChange={handleInputChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+            Category
+          </label>
+          <input
+            type="text"
+            id="category"
+            name="category"
+            value={product.category}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={product.description || ''}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            rows={3}
           />
         </div>
 

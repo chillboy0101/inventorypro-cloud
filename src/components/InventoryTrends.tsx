@@ -96,14 +96,14 @@ const InventoryTrends: React.FC = () => {
     };
   }, [activeProducts, selectedPeriod]);
 
-  const handleNewStockAdjustment = (adjustment: any) => {
-    const product = activeProducts.find(p => p.id === adjustment.product_id);
+  const handleNewStockAdjustment = (adjustment: unknown) => {
+    const product = activeProducts.find(p => p.id === (adjustment as any).product_id);
     if (product) {
       const newStockLevel: StockLevel = {
         productId: product.id,
         productName: product.name,
-        stock: adjustment.new_quantity,
-        timestamp: adjustment.created_at
+        stock: (adjustment as any).new_quantity,
+        timestamp: (adjustment as any).created_at
       };
       
       setStockLevels(prev => {

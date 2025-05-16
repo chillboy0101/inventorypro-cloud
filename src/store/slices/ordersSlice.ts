@@ -78,6 +78,7 @@ export const createOrder = createAsyncThunk(
       product_id: string;
       quantity: number;
       price: number;
+      serial_numbers?: string[];
       product?: Product;
     }>;
   }, { dispatch, rejectWithValue }) => {
@@ -167,6 +168,17 @@ export const createOrder = createAsyncThunk(
       // Refresh products after stock update
       await dispatch(fetchProducts());
 
+      // After inserting order_items, before returning:
+      if (orderData.items.some(item => item.serial_numbers && item.serial_numbers.length > 0)) {
+        for (const item of orderData.items) {
+          if (item.serial_numbers && item.serial_numbers.length > 0) {
+            await supabase.from('serial_numbers')
+              .update({ status: 'sold', order_id: orderId })
+              .in('id', item.serial_numbers);
+          }
+        }
+      }
+
       // Return the order with its items
       return {
         ...newOrder,
@@ -223,6 +235,14 @@ export const updateOrderStatus = createAsyncThunk(
 
         if (updateError) throw updateError;
       }
+
+      // Restore serial numbers for this order
+      const { error: serialsError } = await supabase
+        .from('serial_numbers')
+        .update({ status: 'available', order_id: null })
+        .eq('order_id', id)
+        .eq('status', 'sold');
+      if (serialsError) throw serialsError;
 
       // Refresh products after stock update
       await dispatch(fetchProducts());

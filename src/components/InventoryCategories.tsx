@@ -20,7 +20,7 @@ interface CategoryData {
 }
 
 const InventoryCategories: React.FC = () => {
-  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [categoryData, setCategoryData] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const products = useSelector((state: RootState) => state.inventory.items);
 

@@ -202,11 +202,11 @@ const ForgotPassword: React.FC = () => {
 
       {/* Right side - Form */}
       <motion.div 
-        className="flex-1 flex items-center justify-center p-8"
+        className="flex-1 flex items-center justify-center p-2 sm:p-8"
         variants={animations.fadeIn}
       >
         <motion.div 
-          className="w-full max-w-md space-y-8"
+          className="w-full max-w-xs sm:max-w-md space-y-8"
           variants={staggerChildren}
         >
           <motion.div 

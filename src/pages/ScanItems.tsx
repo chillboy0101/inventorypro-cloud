@@ -28,10 +28,8 @@ const ScanItems: React.FC = () => {
     }
   };
 
-  const handleError = (err: any) => {
-    console.error('Error accessing camera:', err);
-    setError('Error accessing camera. Please make sure you have granted camera permissions.');
-  };
+  // Error handling is now managed in the QrReader component itself
+  // We receive errors through the onResult callback when there's an issue
 
   const handleReset = () => {
     setScanning(true);
@@ -55,7 +53,6 @@ const ScanItems: React.FC = () => {
             <QrReader
               constraints={{ facingMode: 'environment' }}
               onResult={handleScan}
-              onError={handleError}
               className="w-full"
             />
             <p className="mt-4 text-sm text-gray-600 text-center">

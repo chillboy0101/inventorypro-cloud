@@ -596,239 +596,143 @@ const Reports: React.FC = () => {
   const inventoryTurnover = getInventoryTurnover();
 
   return (
-    <div className="p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-        <div className="flex space-x-4">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="7">Last 7 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="90">Last 90 Days</option>
-            <option value="all">All Time</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="3">Last 3 Days</option>
-          </select>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border border-gray-300 rounded-md pl-10 pr-4 py-1.5 text-sm focus:ring-indigo-500 focus:border-indigo-500 w-64"
-            />
-            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-          </div>
+    <div className="p-2 sm:p-6 space-y-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
+          <p className="text-sm text-gray-600 mt-1">View your business performance, sales, and inventory trends.</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Key Metrics */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <h3 className="text-lg font-semibold mb-4">Key Metrics</h3>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">Monthly Revenue</p>
-              <p className="text-2xl font-bold">{formatPrice(monthlyRevenue)}</p>
-              <div className="flex items-center mt-1">
-                {revenueChange >= 0 ? (
-                  <ArrowUpIcon className="h-4 w-4 text-green-500" />
-                ) : (
-                  <ArrowDownIcon className="h-4 w-4 text-red-500" />
-                )}
-                <span className={`text-sm ${revenueChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {Math.abs(revenueChange).toFixed(1)}% vs last month
-                </span>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Average Order Value</p>
-              <p className="text-2xl font-bold">{formatPrice(averageOrderValue)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Inventory Turnover Rate</p>
-              <p className="text-2xl font-bold">{inventoryTurnover.toFixed(2)}x</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Top Products */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <h3 className="text-lg font-semibold mb-4">Top Products</h3>
-          <div className="space-y-3">
-            {getTopProducts().map((product, index) => (
-              <div key={index} className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">{product.name}</span>
-                <span className="text-sm font-medium">{product.sales} units</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Inventory Categories */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <InventoryCategories />
-        </div>
-      </div>
-
-      {/* Financial Summary Section */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Financial Summary</h3>
+        <div className="flex flex-col xs:flex-row flex-wrap gap-2 w-full sm:w-auto">
           <button
-            onClick={generateFinancialSummary}
+            onClick={generateSalesReport}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full xs:w-auto"
             disabled={loading}
-            className="px-4 py-2 text-sm bg-green-50 text-green-700 rounded-md hover:bg-green-100 border border-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            Export Financial Summary
+            Export Sales Report
           </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {(() => {
-            const metrics = calculateProfitMetrics();
-            return (
-              <>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Total Revenue</p>
-                  <p className="text-2xl font-bold">{formatPrice(metrics.revenue)}</p>
-                  <div className="flex items-center">
-                    {revenueChange >= 0 ? (
-                      <ArrowUpIcon className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <ArrowDownIcon className="h-4 w-4 text-red-500" />
-                    )}
-                    <span className={`text-sm ${revenueChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {Math.abs(revenueChange).toFixed(1)}% vs last month
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Gross Profit</p>
-                  <p className="text-2xl font-bold">{formatPrice(metrics.grossProfit)}</p>
-                  <p className="text-sm text-gray-500">Margin: {metrics.grossMargin.toFixed(1)}%</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Net Profit</p>
-                  <p className="text-2xl font-bold">{formatPrice(metrics.netProfit)}</p>
-                  <p className="text-sm text-gray-500">Margin: {metrics.netMargin.toFixed(1)}%</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">COGS</p>
-                  <p className="text-2xl font-bold">{formatPrice(metrics.cogs)}</p>
-                  <p className="text-sm text-gray-500">Cost of goods sold</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Top Profitable Products */}
-        <div className="mt-8">
-          <h4 className="text-md font-semibold text-gray-700 mb-4">Most Profitable Products</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {getTopProfitableProducts().map(product => (
-              <div key={product.id} className="bg-gray-50 rounded-lg p-4">
-                <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                <p className="text-sm text-gray-500 mt-1">Profit: {formatPrice(product.profit)}</p>
-                <p className="text-sm text-gray-500">Margin: {product.margin.toFixed(1)}%</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Analysis Section */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Performance Analysis</h3>
+          <button
+            onClick={generateInventoryExport}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 w-full xs:w-auto"
+            disabled={loading}
+          >
+            Export Inventory CSV
+          </button>
           <button
             onClick={generatePerformanceAnalysis}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 w-full xs:w-auto"
             disabled={loading}
-            className="px-4 py-2 text-sm bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            Export Performance Report
+            Export Performance
           </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500">Top Product</p>
-            <p className="text-2xl font-bold truncate">{topProduct.name}</p>
-            <p className="text-sm text-green-600">{topProduct.sales} units sold</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500">Average Order</p>
-            <p className="text-2xl font-bold">{formatPrice(averageOrderValue)}</p>
-            <p className="text-sm text-gray-500">Per transaction</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500">Inventory Turnover</p>
-            <p className="text-2xl font-bold">{inventoryTurnover.toFixed(2)}x</p>
-            <p className="text-sm text-gray-500">Stock rotation rate</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500">Total Orders</p>
-            <p className="text-2xl font-bold">{orders.length}</p>
-            <p className="text-sm text-gray-500">All time</p>
-          </div>
+          <button
+            onClick={generateFinancialSummary}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-yellow-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 w-full xs:w-auto"
+            disabled={loading}
+          >
+            Export Financials
+          </button>
         </div>
       </div>
 
-      {/* Sales Trend */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h3 className="text-lg font-semibold mb-4">Sales Trend</h3>
-        <div className="h-[300px]">
+      {/* Filters and Date Range */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center">
+        <div className="flex-1">
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search products or orders..."
+              className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        <select
+          value={dateRange}
+          onChange={e => setDateRange(e.target.value)}
+          className="rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="3">Last 3 Days</option>
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
+
+      {/* Summary Cards - stack on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col items-start">
+          <span className="text-xs text-gray-500">Monthly Revenue</span>
+          <span className="text-2xl font-bold text-gray-900">{formatPrice(monthlyRevenue)}</span>
+          <span className={`text-sm mt-1 ${revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>{revenueChange >= 0 ? <ArrowUpIcon className="h-4 w-4 inline" /> : <ArrowDownIcon className="h-4 w-4 inline" />} {Math.abs(revenueChange).toFixed(1)}%</span>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col items-start">
+          <span className="text-xs text-gray-500">Avg. Order Value</span>
+          <span className="text-2xl font-bold text-gray-900">{formatPrice(averageOrderValue)}</span>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col items-start">
+          <span className="text-xs text-gray-500">Inventory Turnover</span>
+          <span className="text-2xl font-bold text-gray-900">{inventoryTurnover.toFixed(2)}</span>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 flex flex-col items-start">
+          <span className="text-xs text-gray-500">Top Product</span>
+          <span className="text-lg font-bold text-gray-900">{topProduct.name}</span>
+          <span className="text-sm text-gray-700">{topProduct.sales} sold</span>
+        </div>
+      </div>
+
+      {/* Charts and Tables - horizontally scrollable on mobile */}
+      <div className="overflow-x-auto">
+        {/* Example: Bar chart for sales trends */}
+        <div className="min-w-[350px] sm:min-w-0">
           <Bar
             data={{
               labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-              datasets: [{
-                label: 'Monthly Sales',
-                data: getSalesData(),
-                backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                borderColor: 'rgba(99, 102, 241, 1)',
-                borderWidth: 1
-              }]
+              datasets: [
+                {
+                  label: 'Sales',
+                  data: getSalesData(),
+                  backgroundColor: '#6366f1',
+                },
+              ],
             }}
             options={{
               responsive: true,
-              maintainAspectRatio: false,
               plugins: {
-                legend: {
-                  display: false
-                }
+                legend: { display: false },
+                title: { display: true, text: 'Sales Trends (Last 6 Months)' },
               },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: (value) => `$${value.toLocaleString()}`
-                  }
-                }
-              }
             }}
           />
         </div>
       </div>
 
-      {/* Export Buttons */}
-      <div className="flex space-x-4">
-        <button
-          onClick={generateSalesReport}
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          Export Sales Report
-        </button>
-        <button
-          onClick={generateInventoryExport}
-          disabled={loading}
-          className="px-4 py-2 bg-white text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          Export Inventory
-        </button>
+      {/* Top Products Table - horizontally scrollable on mobile */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[400px] sm:min-w-0">
+          <h2 className="text-lg font-semibold mb-2">Top Selling Products</h2>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sales</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {getTopProducts().map((product, idx) => (
+                <tr key={idx}>
+                  <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{product.sales}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

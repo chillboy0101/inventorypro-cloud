@@ -206,7 +206,7 @@ const UserSettings: React.FC = () => {
   };
 
   return (
-    <div className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${settings.darkMode ? 'text-gray-100' : ''}`}>
+    <div className={`max-w-3xl mx-auto px-2 sm:px-6 lg:px-8 py-8 ${settings.darkMode ? 'text-gray-100' : ''}`}>
       <div className="mb-8 flex items-center">
         <button
           onClick={goBack}
@@ -225,42 +225,21 @@ const UserSettings: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Company Information */}
-        <div className={`p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
+        <div className={`p-4 sm:p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
           <h2 className="text-lg font-medium mb-6 pb-3 border-b border-gray-200 dark:border-gray-700">Company Information</h2>
-          
-          <div className="flex items-center mb-4">
-            <div className={`w-10 h-10 rounded-md flex items-center justify-center mr-3 ${
-              settings.darkMode ? 'bg-blue-900/20' : 'bg-blue-100'
-            }`}>
-              <BuildingOfficeIcon className="h-6 w-6 text-blue-500" />
-            </div>
-            <div className="flex-1">
-              <label htmlFor="companyName" className="block text-sm font-medium">
-                Company Name
-              </label>
-              <input
-                id="companyName"
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${
-                  settings.darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
-                    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                }`}
-                placeholder="Enter your company name"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                This name will be displayed throughout the application and on generated reports.
-              </p>
+          <div className="flex flex-col sm:flex-row items-center mb-4 gap-4">
+            <div className={`w-10 h-10 rounded-md flex items-center justify-center mr-0 sm:mr-3 ${settings.darkMode ? 'bg-blue-900/20' : 'bg-blue-100'}`}> <BuildingOfficeIcon className="h-6 w-6 text-blue-500" /> </div>
+            <div className="flex-1 w-full">
+              <label htmlFor="companyName" className="block text-sm font-medium">Company Name</label>
+              <input id="companyName" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${settings.darkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'}`} placeholder="Enter your company name" />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">This name will be displayed throughout the application and on generated reports.</p>
             </div>
           </div>
         </div>
 
         {/* User Information */}
-        <div className={`p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
+        <div className={`p-4 sm:p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
           <h2 className="text-lg font-medium mb-6 pb-3 border-b border-gray-200 dark:border-gray-700">User Information</h2>
-          
           <div className="flex flex-col sm:flex-row gap-6">
             <div className="flex justify-center sm:block">
               {/* Profile Image Upload */}
@@ -319,7 +298,7 @@ const UserSettings: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-4 w-full">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium">
                   Name
@@ -358,7 +337,7 @@ const UserSettings: React.FC = () => {
         </div>
 
         {/* Inventory Settings */}
-        <div className={`p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
+        <div className={`p-4 sm:p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
           <h2 className="text-lg font-medium mb-6 pb-3 border-b border-gray-200 dark:border-gray-700">Inventory Settings</h2>
           
           <div className="space-y-6">
@@ -556,7 +535,7 @@ const UserSettings: React.FC = () => {
         </div>
 
         {/* Preferences */}
-        <div className={`p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
+        <div className={`p-4 sm:p-6 rounded-xl border ${settings.darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'} settings-card`}>
           <h2 className="text-lg font-medium mb-6 pb-3 border-b border-gray-200 dark:border-gray-700">Preferences</h2>
           
           <div className="space-y-6">
@@ -659,24 +638,9 @@ const UserSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={goBack}
-            className={`px-4 py-2 border shadow-sm text-sm font-medium rounded-md ${
-              settings.darkMode 
-                ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600' 
-                : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="inline-flex justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
+        {/* Save Button */}
+        <div className="flex flex-col xs:flex-row justify-end gap-2 xs:space-x-3 w-full">
+          <button type="submit" disabled={isSaving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full xs:w-auto disabled:opacity-50">
             {isSaving ? 'Saving...' : 'Save Settings'}
           </button>
         </div>

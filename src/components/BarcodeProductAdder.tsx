@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import BarcodeScanner from './BarcodeScanner';
+import { BarcodeScanner } from './BarcodeScanner';
 import AddProductForm from './AddProductForm';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -30,7 +30,7 @@ const BarcodeProductAdder: React.FC<BarcodeProductAdderProps> = ({ onComplete })
     if (onComplete) onComplete();
   };
 
-  const handleBarcodeScanned = (barcode: string) => {
+  const handleBarcodeScanned = async (barcode: string): Promise<void> => {
     setScannedBarcode(barcode);
     setShowAddForm(true);
   };
@@ -89,7 +89,7 @@ const BarcodeProductAdder: React.FC<BarcodeProductAdderProps> = ({ onComplete })
                           </p>
                           <div className="flex justify-center my-4">
                             <BarcodeScanner 
-                              onCodeScanned={handleBarcodeScanned}
+                              onScan={handleBarcodeScanned}
                               buttonText="Start Scanning"
                             />
                           </div>
